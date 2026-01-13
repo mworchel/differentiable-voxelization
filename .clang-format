@@ -1,0 +1,27 @@
+﻿---
+AccessModifierOffset: '-4'
+AlignConsecutiveAssignments: 'true'
+AlignConsecutiveDeclarations: 'true'
+BreakBeforeBraces: Allman
+BreakConstructorInitializers: BeforeComma
+ColumnLimit: '0'
+IndentWidth: '4'
+Language: Cpp
+PointerAlignment: Left
+SortIncludes: 'true'
+SpaceAfterCStyleCast: 'false'
+SpaceAfterLogicalNot: 'false'
+SpaceAfterTemplateKeyword: 'false'
+SpaceBeforeAssignmentOperators: 'true'
+SpaceBeforeCpp11BracedList: 'false'
+SpaceBeforeRangeBasedForLoopColon: 'true'
+SpaceInEmptyParentheses: 'false'
+SpacesInAngles: 'false'
+SpacesInCStyleCastParentheses: 'false'
+SpacesInContainerLiterals: 'false'
+SpacesInParentheses: 'false'
+SpacesInSquareBrackets: 'false'
+TabWidth: '4'
+UseTab: Never
+
+...
