@@ -4,6 +4,8 @@
 #include <random>
 #include <stdexcept>
 #include <cstdint>
+#define _USE_MATH_DEFINES
+#include <cmath>
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -11,10 +13,13 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
+#include "common.hpp"
 #include "log.hpp"
 #include "math.hpp"
 
 namespace nb = nanobind;
+
+static bool suppress_warnings = false;
 
 // Checks if a each nanobind array is allocated on the given device
 template<typename Array, typename... Arrays>
@@ -30,10 +35,50 @@ void check_on_device(int device_type, int device_id, Array&& a, Arrays&&... arra
 namespace dvx
 {
 
+enum class FilterType
+{
+    Box = 0,
+    Gaussian
+};
+
+template<typename Float>
+struct Filter
+{
+    FilterType type;
+    Float      radius; // Filter radius in world space
+
+    DEVICE Float eval(Float distance)
+    {
+        switch (type)
+        {
+        case FilterType::Box:
+            return Float(distance < radius);
+        case FilterType::Gaussian:
+        {
+            constexpr Float const norm = Float(0.5 * M_SQRT1_2 * M_2_SQRTPI);
+            return Float(distance < radius) * norm * MAYBE_STD(exp)(-Float(0.5) * (distance * distance) / (2 * gaussian.stddev * gaussian.stddev));
+        }
+        default:
+            return 0;
+        }
+    }
+
+    union
+    {
+        struct
+        {
+        } box;
+        struct
+        {
+            Float stddev;
+        } gaussian;
+    };
+};
+
 template<typename Float, unsigned int N>
 Float generalized_winding_number(Float const* vertices, uint32_t num_vertices,
-                                uint32_t const* simplices, uint32_t num_simplices,
-                                Point<Float, N> const& x)
+                                 uint32_t const* simplices, uint32_t num_simplices,
+                                 Point<Float, N> const& x)
 {
     Float occupancy = 0.f;
     for (uint32_t s = 0; s < num_simplices; ++s)
@@ -68,13 +113,11 @@ template<typename Float>
 void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
                      uint32_t const* edges, uint32_t num_edges,
                      Float* occupancy, uint32_t height, uint32_t width,
-                     uint32_t num_samples_per_voxel, Float filter_radius)
+                     uint32_t num_samples_per_voxel, 
+                     Filter<Float> filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
-
-    // Filter radius in world space
-    // Float const filter_radius = 0.1f;
 
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector2<Float> const voxel_size{
@@ -118,8 +161,8 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
         Point2<Float> const sample_grid_coord = Point2<Float>(Float(x), Float(y)) + sample_local;
 
         Float filter_support[2] = {
-            filter_radius / voxel_size[0],
-            filter_radius / voxel_size[1]
+            filter.radius / voxel_size[0],
+            filter.radius / voxel_size[1]
         };
 
         int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
@@ -132,20 +175,17 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
             for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t>(width), max_x + 1); ++nx)
             {
                 // Compute the weight using the distance from the sample to the voxel center
-                Point2<Float> n_center{
+                Point2<Float> const n_center{
                     (nx + Float(0.5)) * voxel_size[0] - Float(1),
-                    (ny + Float(0.5)) * voxel_size[1] - Float(1)
-                };
+                    (ny + Float(0.5)) * voxel_size[1] - Float(1)};
 
-                Float distance = norm(n_center - sample);
+                Float const distance = norm(n_center - sample);
 
-                // Box filter
-                Float sample_weight = Float(distance < filter_radius);
-
-                if (sample_weight > 0)
+                Float const filter_weight = filter.eval(distance);
+                if (filter_weight > 0)
                 {
-                    uint64_t n_voxel_index = width * ny + nx;
-                    occupancy[n_voxel_index] += sample_occupancy;
+                    uint64_t const n_voxel_index = width * ny + nx;
+                    occupancy[n_voxel_index] += filter_weight * sample_occupancy;
                     ++weight[n_voxel_index];
                 }
             }
@@ -279,9 +319,29 @@ void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
 
     check_on_device(vertices.device_type(), vertices.device_id(), vertices, simplices, occupancy);
 
+    unsigned int N = vertices.shape(1);
+
+    dvx::Filter<Float> filter{
+        .type   = dvx::FilterType::Box,
+        .radius = filter_radius};
+
+    if (!suppress_warnings && num_samples_per_voxel < 16)
+    {
+        for (int i = 0; i < N; ++i)
+        {
+            Float voxel_spacing = Float(2) / occupancy.shape(i);
+            if (filter.radius < voxel_spacing)
+            {
+                nb::print(format_message("Warning: The filter radius (%f) is smaller than the space between voxels in dimension %d (%f).\n"
+                                        "This can result in voxels without valid samples. Consider increasing the sample count or the filter radius.",
+                                        filter.radius, i, voxel_spacing));
+            }
+        }
+    }
+
     if (vertices.shape(1) == 2)
         dvx::voxelize_2d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), num_samples_per_voxel, filter_radius);
+                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), num_samples_per_voxel, filter);
     if (vertices.shape(1) == 3)
         dvx::voxelize_3d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                     occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel);
@@ -296,6 +356,8 @@ NB_MODULE(dvx_ext, m)
 #endif
 
     m.def("build_type", [=]() { return build_type; });
+    m.def("mute", [=]() { suppress_warnings = true; });
+    m.def("unmute", [=]() { suppress_warnings = false; });
 
     m.def("voxelize_f32", voxelize<float>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));
 }
