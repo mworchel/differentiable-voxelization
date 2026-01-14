@@ -47,14 +47,21 @@ struct Filter
     FilterType type;
     Float      radius; // Filter radius in world space
 
-    DEVICE Float eval(Float distance)
+    template<unsigned int N>
+    DEVICE Float eval(Vector<Float, N> const& difference)
     {
         switch (type)
         {
         case FilterType::Box:
-            return Float(distance < radius);
+        {
+            for (unsigned int i = 0; i < N; ++i)
+                if (MAYBE_STD(abs)(difference[i]) < radius)
+                    return true;
+            return false;
+        }
         case FilterType::Gaussian:
         {
+            Float const distance = norm(difference);
             constexpr Float const norm = Float(0.5 * M_SQRT1_2 * M_2_SQRTPI);
             return Float(distance < radius) * norm * MAYBE_STD(exp)(-Float(0.5) * (distance * distance) / (2 * gaussian.stddev * gaussian.stddev));
         }
@@ -146,7 +153,7 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
         uint32_t const y = voxel_index / width;
         uint32_t const x = voxel_index % width;
 
-        Point2<Float> const voxel_origin = {
+        Point2<Float> const voxel_origin{
             x * voxel_size[0] - Float(1),
             y * voxel_size[1] - Float(1)
         };
@@ -179,9 +186,7 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
                     (nx + Float(0.5)) * voxel_size[0] - Float(1),
                     (ny + Float(0.5)) * voxel_size[1] - Float(1)};
 
-                Float const distance = norm(n_center - sample);
-
-                Float const filter_weight = filter.eval(distance);
+                Float const filter_weight = filter.eval(n_center - sample);
                 if (filter_weight > 0)
                 {
                     uint64_t const n_voxel_index = width * ny + nx;
