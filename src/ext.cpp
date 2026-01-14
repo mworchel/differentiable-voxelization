@@ -54,16 +54,37 @@ struct Filter
         {
         case FilterType::Box:
         {
+            bool is_inside = true;
             for (unsigned int i = 0; i < N; ++i)
-                if (MAYBE_STD(abs)(difference[i]) < radius)
-                    return true;
-            return false;
+                is_inside &= MAYBE_STD(abs)(difference[i]) < radius;
+            return Float(is_inside) / volume<N>();
         }
         case FilterType::Gaussian:
         {
             Float const distance = norm(difference);
             constexpr Float const norm = Float(0.5 * M_SQRT1_2 * M_2_SQRTPI);
             return Float(distance < radius) * norm * MAYBE_STD(exp)(-Float(0.5) * (distance * distance) / (2 * gaussian.stddev * gaussian.stddev));
+        }
+        default:
+            return 0;
+        }
+    }
+
+    template<unsigned int N>
+    DEVICE Float volume()
+    {        switch (type)
+        {
+        case FilterType::Box:
+        {
+            if constexpr (N == 2)
+                return 4 * radius * radius;
+            if constexpr (N == 3)
+                return 8 * radius * radius * radius;
+            return 0;
+        }
+        case FilterType::Gaussian:
+        {
+            return Float(1);
         }
         default:
             return 0;
@@ -132,10 +153,7 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
         Float(2) / height
     };
 
-    // TODO: Avoid re-allocation
-    Float* weight = new Float[height*width];
-    for (uint64_t i = 0; i < height*width; ++i)
-        weight[i] = Float(0);
+    Float const voxel_volume = voxel_size[0] * voxel_size[1];
 
     uint64_t num_samples = num_samples_per_voxel * height * width;
     for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
@@ -187,25 +205,12 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
                     (ny + Float(0.5)) * voxel_size[1] - Float(1)};
 
                 Float const filter_weight = filter.eval(n_center - sample);
+                uint64_t const n_voxel_index = width * ny + nx;
                 if (filter_weight > 0)
-                {
-                    uint64_t const n_voxel_index = width * ny + nx;
-                    occupancy[n_voxel_index] += filter_weight * sample_occupancy;
-                    ++weight[n_voxel_index];
-                }
+                    occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_per_voxel; // 
             }
         }
     }
-
-    // Normalize occupancy grid
-    for (uint64_t i = 0; i < height*width; ++i)
-    {
-        Float w = weight[i];
-        if (w != Float(0))
-            occupancy[i] *= (2 / w);
-    }
-
-    delete[] weight;
 }
 
 template<typename Float, unsigned int N>
