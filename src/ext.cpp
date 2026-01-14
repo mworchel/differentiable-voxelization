@@ -207,7 +207,7 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
                 Float const filter_weight = filter.eval(n_center - sample);
                 uint64_t const n_voxel_index = width * ny + nx;
                 if (filter_weight > 0)
-                    occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_per_voxel; // 
+                    occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_per_voxel;
             }
         }
     }
@@ -397,6 +397,116 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
     }
 }
 
+// Forward-mode derivatives of the smooth indicator function
+template<typename Float>
+void voxelize_3d_forward_cpu(Float const* vertices, uint32_t num_vertices,
+                             uint32_t const* faces, uint32_t num_faces,
+                             Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
+                             Float const* d_vertices,
+                             Float* d_occupancy,
+                             uint32_t num_samples_per_simplex, 
+                             Filter<Float> filter)
+{
+    std::default_random_engine            engine(std::random_device{}());
+    std::uniform_real_distribution<Float> distribution;
+
+    // TODO: Lift assumption of grid being in [-1,1]^3
+    Vector3<Float> const voxel_size{
+        Float(2) / width,
+        Float(2) / height,
+        Float(2) / depth
+    };
+
+    // Compute the boundary term (integration over edges)
+    for (uint32_t f = 0; f < num_faces; ++f)
+    {
+        uint32_t const v0_idx = faces[3*f + 0];
+        uint32_t const v1_idx = faces[3*f + 1];
+        uint32_t const v2_idx = faces[3*f + 2];
+
+        Point3<Float> const v0{
+            vertices[3*v0_idx + 0],
+            vertices[3*v0_idx + 1],
+            vertices[3*v0_idx + 2],
+        };
+
+        Point3<Float> const v1{
+            vertices[3*v1_idx + 0],
+            vertices[3*v1_idx + 1],
+            vertices[3*v1_idx + 2],
+        };
+
+        Point3<Float> const v2{
+            vertices[3*v2_idx + 0],
+            vertices[3*v2_idx + 1],
+            vertices[3*v2_idx + 2],
+        };
+
+        Vector3<Float> const v0v1 = v1 - v0;
+        Vector3<Float> const v0v2 = v2 - v0;
+
+        Vector3<Float> const cross_e1e2 = cross(v0v1, v0v2);
+        Vector3<Float> const normal     = normalize(cross_e1e2);
+        Float const          area       = Float(0.5) * norm(cross_e1e2);
+
+        // Monte Carlo integration over the edge
+        // TODO: Stratified sampling?
+        // TODO: Quadrature?
+        for (uint32_t sample_index = 0; sample_index < num_samples_per_simplex; ++sample_index)
+        {
+            Float u = distribution(engine);
+            Float v = distribution(engine);
+            if (u + v > Float(1))
+            {
+                u = 1 - u;
+                v = 1 - v;
+            }
+            // x_b = (1-u-v) * v0 + u * v1 + v * v2 = v0 + u * (v1 - v0) + v * (v2 - v0)
+            Vector3<Float> const d_v0{d_vertices[3 * v0_idx + 0], d_vertices[3 * v0_idx + 1], d_vertices[3 * v0_idx + 2]};
+            Vector3<Float> const d_v1{d_vertices[3 * v1_idx + 0], d_vertices[3 * v1_idx + 1], d_vertices[3 * v1_idx + 2]};
+            Vector3<Float> const d_v2{d_vertices[3 * v2_idx + 0], d_vertices[3 * v2_idx + 1], d_vertices[3 * v2_idx + 2]};
+
+            Float const xb0 = dot(d_v0, normal * (1 - u - v));
+            Float const xb1 = dot(d_v1, normal * u);
+            Float const xb2 = dot(d_v2, normal * v);
+
+            Point3<Float> const sample            = v0 + u * v0v1 + v * v0v2;
+            Point3<Float> const sample_grid_coord = point_to_grid_coord(sample, voxel_size);
+
+            // TODO: Make function
+            Float const filter_support[3] = {
+                filter.radius / voxel_size[0],
+                filter.radius / voxel_size[1],
+                filter.radius / voxel_size[2]
+            };
+
+            int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
+            int32_t const max_x = floor(sample_grid_coord[0] + filter_support[0]);
+            int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
+            int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
+            int32_t const min_z = floor(sample_grid_coord[2] - filter_support[2]);
+            int32_t const max_z = floor(sample_grid_coord[2] + filter_support[2]);
+
+            for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
+            {
+                for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
+                {
+                    for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                    {
+                        // Compute the weight using the distance from the sample to the voxel center
+                        Point3<Float> const n_center{
+                            (nx + Float(0.5)) * voxel_size[0] - Float(1),
+                            (ny + Float(0.5)) * voxel_size[1] - Float(1),
+                            (nz + Float(0.5)) * voxel_size[2] - Float(1)
+                        };
+
+                        Float const filter_weight = filter.eval(n_center - sample);
+                        uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
+                        if (filter_weight != Float(0))
+                        {
+                            d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1 + xb2) * area / Float(num_samples_per_simplex);
+                        }
+                    }
                 }
             }
         }
@@ -484,6 +594,11 @@ void voxelize_forward(nb::ndarray<Float, nb::c_contig> const &vertices,
     if (vertices.shape(1) == 2)
         dvx::voxelize_2d_forward_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                             occupancy.data(), occupancy.shape(0), occupancy.shape(1), 
+                                            d_vertices.data(), d_occupancy.data(),
+                                            num_samples_per_simplex, filter);
+    if (vertices.shape(1) == 3)
+        dvx::voxelize_3d_forward_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                            occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
                                             d_vertices.data(), d_occupancy.data(),
                                             num_samples_per_simplex, filter);
 }
