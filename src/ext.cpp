@@ -224,7 +224,7 @@ Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> c
 template<typename Float>
 void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
                              uint32_t const* edges, uint32_t num_edges,
-                             Float* occupancy, uint32_t height, uint32_t width,
+                             Float* occupancy, uint32_t const height, uint32_t const width,
                              Float const* d_vertices,
                              Float* d_occupancy,
                              uint32_t num_samples_per_simplex, 
@@ -273,7 +273,7 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
             Vector2<Float> const d_v1{d_vertices[2 * v1_idx + 0], d_vertices[2 * v1_idx + 1]};
 
             Float const xb0 = dot(d_v0, normal * (1 - u));
-            Float const xb1 = dot(d_v1,  normal * u);
+            Float const xb1 = dot(d_v1, normal * u);
 
             Point2<Float> const sample            = v0 + u * v0v1;
             Point2<Float> const sample_grid_coord = point_to_grid_coord(sample, voxel_size);
@@ -288,9 +288,9 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
             int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
             int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
 
-            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t>(height), max_y + 1); ++ny)
+            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
             {
-                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t>(width), max_x + 1); ++nx)
+                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
                 {
                     // Compute the weight using the distance from the sample to the voxel center
                     Point2<Float> const n_center{
