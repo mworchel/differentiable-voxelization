@@ -312,23 +312,21 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
 template<typename Float>
 void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
                      uint32_t const* faces, uint32_t num_faces,
-                     Float* grid, uint32_t depth, uint32_t height, uint32_t width,
-                     uint32_t num_samples_per_voxel)
+                     Float* occupancy, uint32_t depth, uint32_t height, uint32_t width,
+                     uint32_t num_samples_per_voxel, 
+                     Filter<Float> filter)
 {
-    // TODO: Fixme
-
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
 
-    // Filter radius in world space
-    Float const filter_radius = 0.1f;
-
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector3<Float> const voxel_size{
-        Float(2) / depth,
+        Float(2) / width,
         Float(2) / height,
-        Float(2) / width
+        Float(2) / depth
     };
+
+    Float const voxel_volume = voxel_size[0] * voxel_size[1] * voxel_size[2];
 
     uint64_t num_samples = num_samples_per_voxel * depth * height * width;
     for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
@@ -337,7 +335,7 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
         Point3<Float> const sample_local{
             distribution(engine),
             distribution(engine),
-            distribution(engine),
+            distribution(engine)
         };
 
         // Transform sample to global space
@@ -349,54 +347,56 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
         uint32_t const x = (voxel_index % (height * width)) % width;
 
         Point3<Float> const voxel_origin = {
-            z * voxel_size[0],
-            y * voxel_size[1],
-            x * voxel_size[2]
+            x * voxel_size[0] - Float(1),
+            y * voxel_size[1] - Float(1),
+            z * voxel_size[2] - Float(1)
         };
 
         Point3<Float> const sample = voxel_origin + voxel_size * sample_local;
-
-        // TODO: Determine 'occupancy' at the sample
-        Float occupancy = 0.f;
-        for (uint32_t f = 0; f < num_faces; ++f)
-        {
-            // Load the vertices and immediately compute `e` vectors
-            Vector3<Float> e[3];
-            for (int i = 0; i < 3; ++i)
-                e[i] = normalize(Point3<Float>{
-                                     vertices[3 * faces[3*f + i] + 0],
-                                     vertices[3 * faces[3*f + i] + 1],
-                                     vertices[3 * faces[3*f + i] + 2],
-                                 } -
-                                 sample);
-
-            Float const alpha = dot(cross(e[0], e[1]), e[2]);
-            Float const beta  = 1 + dot(e[0], e[1]) + dot(e[1], e[2]) + dot(e[2], e[0]);
-            occupancy += atan2(alpha, beta);
-        }
-
+        
+        Float sample_occupancy = generalized_winding_number<Float, 3>(vertices, num_vertices, 
+                                                                      faces, num_faces, 
+                                                                      sample);
+            
         // Splat the sample into the grid
-        uint32_t filter_support[3] = {
-            static_cast<uint32_t>(ceil(filter_radius / voxel_size[0])),
-            static_cast<uint32_t>(ceil(filter_radius / voxel_size[1])),
-            static_cast<uint32_t>(ceil(filter_radius / voxel_size[2])),
+        Point3<Float> const sample_grid_coord = Point3<Float>(Float(x), Float(y), Float(z)) + sample_local;
+
+        Float filter_support[] = {
+            filter.radius / voxel_size[0],
+            filter.radius / voxel_size[1],
+            filter.radius / voxel_size[2],
         };
 
-        int32_t const min_z = static_cast<int32_t>(z) - filter_support[0];
-        int32_t const max_z = static_cast<int32_t>(z) + filter_support[0];
-        int32_t const min_y = static_cast<int32_t>(y) - filter_support[1];
-        int32_t const max_y = static_cast<int32_t>(y) + filter_support[1];
-        int32_t const min_x = static_cast<int32_t>(x) - filter_support[2];
-        int32_t const max_x = static_cast<int32_t>(x) + filter_support[2];
+        int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
+        int32_t const max_x = floor(sample_grid_coord[0] + filter_support[0]);
+        int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
+        int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
+        int32_t const min_z = floor(sample_grid_coord[2] - filter_support[2]);
+        int32_t const max_z = floor(sample_grid_coord[2] + filter_support[2]);
 
-        for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t>(depth), max_z + 1); ++nz)
+        for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
         {
-            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t>(height), max_y + 1); ++ny)
+            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
             {
-                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t>(width), max_x + 1); ++nx)
+                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
                 {
-                    uint64_t n_voxel_index = width * (height * nz + ny) + nx;
-                    grid[n_voxel_index] += occupancy;
+                    // Compute the weight using the distance from the sample to the voxel center
+                    Point3<Float> const n_center{
+                        (nx + Float(0.5)) * voxel_size[0] - Float(1),
+                        (ny + Float(0.5)) * voxel_size[1] - Float(1),
+                        (nz + Float(0.5)) * voxel_size[2] - Float(1)
+                    };
+
+                    Float const filter_weight = filter.eval(n_center - sample);
+                    uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
+                    if (filter_weight > 0)
+                        occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_per_voxel;
+                }
+            }
+        }
+    }
+}
+
                 }
             }
         }
@@ -450,7 +450,7 @@ void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
                                     occupancy.data(), occupancy.shape(0), occupancy.shape(1), num_samples_per_voxel, filter);
     if (vertices.shape(1) == 3)
         dvx::voxelize_3d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel);
+                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel, filter);
 }
 
 template <typename Float>
