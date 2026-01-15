@@ -216,8 +216,8 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
 template<typename Float, unsigned int N>
 Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
 {
-    Point<Float, N> const grid_origin(-1);
-    return (x - grid_origin) / voxel_size + Point<Float,N>(0);
+    Point<Float, N> const grid_origin(Float(-1));
+    return (x - grid_origin) / voxel_size + Point<Float,N>(Float(0));
 }
 
 // Forward-mode derivatives of the smooth indicator function
@@ -245,15 +245,8 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
         uint32_t const v0_idx = edges[2*e + 0];
         uint32_t const v1_idx = edges[2*e + 1];
 
-        Point2<Float> const v0{
-            vertices[2*v0_idx + 0],
-            vertices[2*v0_idx + 1],
-        };
-
-        Point2<Float> const v1{
-            vertices[2*v1_idx + 0],
-            vertices[2*v1_idx + 1],
-        };
+        Point2<Float> const v0(&vertices[2*v0_idx]);
+        Point2<Float> const v1(&vertices[2*v1_idx]);
 
         Vector2<Float> const v0v1 = v1 - v0;
 
@@ -269,8 +262,8 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
         {
             Float const u = distribution(engine);
             // x_b = (1-u) * v0 + u * v1 = v0 + u * (v1 - v0)
-            Vector2<Float> const d_v0{d_vertices[2 * v0_idx + 0], d_vertices[2 * v0_idx + 1]};
-            Vector2<Float> const d_v1{d_vertices[2 * v1_idx + 0], d_vertices[2 * v1_idx + 1]};
+            Vector2<Float> const d_v0(&d_vertices[2 * v0_idx]);
+            Vector2<Float> const d_v1(&d_vertices[2 * v1_idx]);
 
             Float const xb0 = dot(d_v0, normal * (1 - u));
             Float const xb1 = dot(d_v1, normal * u);
@@ -424,23 +417,9 @@ void voxelize_3d_forward_cpu(Float const* vertices, uint32_t num_vertices,
         uint32_t const v1_idx = faces[3*f + 1];
         uint32_t const v2_idx = faces[3*f + 2];
 
-        Point3<Float> const v0{
-            vertices[3*v0_idx + 0],
-            vertices[3*v0_idx + 1],
-            vertices[3*v0_idx + 2],
-        };
-
-        Point3<Float> const v1{
-            vertices[3*v1_idx + 0],
-            vertices[3*v1_idx + 1],
-            vertices[3*v1_idx + 2],
-        };
-
-        Point3<Float> const v2{
-            vertices[3*v2_idx + 0],
-            vertices[3*v2_idx + 1],
-            vertices[3*v2_idx + 2],
-        };
+        Point3<Float> const v0(&vertices[3*v0_idx]);
+        Point3<Float> const v1(&vertices[3*v1_idx]);
+        Point3<Float> const v2(&vertices[3*v2_idx]);
 
         Vector3<Float> const v0v1 = v1 - v0;
         Vector3<Float> const v0v2 = v2 - v0;

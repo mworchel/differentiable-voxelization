@@ -275,6 +275,13 @@ public:
         (*this) = other;
     }
 
+    inline VectorBase(T const* data)
+    {
+        // Load vector from an array
+        for (unsigned int i = 0; i < N; ++i)
+            m_data[i] = data[i];
+    }
+
     inline T& operator[](unsigned int i)
     {
         assert(i < N);
