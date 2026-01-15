@@ -105,8 +105,42 @@ struct Filter
 };
 
 template<typename Float, unsigned int N>
-Float generalized_winding_number(Float const* vertices, uint32_t num_vertices,
-                                 uint32_t const* simplices, uint32_t num_simplices,
+inline Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
+{
+    Point<Float, N> const grid_origin(Float(-1));
+    return (x - grid_origin) / voxel_size + Point<Float,N>(Float(0));
+}
+
+template<typename Float, unsigned int N>
+inline void get_grid_support(Point<Float, N> const& query_coord, Vector<Float, N> const& extent, int32_t min_coord[N], int32_t max_coord[N])
+{
+    for (unsigned int i = 0; i < N; ++i)
+    {
+        min_coord[i] = query_coord[i] - extent[i];
+        max_coord[i] = query_coord[i] + extent[i];
+    }
+}
+
+template<unsigned int N>
+inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Vector<uint32_t, N> const& grid_size)
+{
+    if constexpr (N == 2)
+        return Point<uint32_t, N>(
+            /*x=*/index % grid_size[0], 
+            /*y=*/index / grid_size[0]);
+    else if constexpr (N == 2)
+        return Point<uint32_t, N>(
+            /*x=*/(index % (grid_size[0] * grid_size[1])) % grid_size[0],
+            /*y=*/(index % (grid_size[0] * grid_size[1])) / grid_size[0],
+            /*z=*/index / (grid_size[0] * grid_size[1])
+        );
+    else 
+        return Point<uint32_t, N>();
+}
+
+template<typename Float, unsigned int N>
+Float generalized_winding_number(Float const* vertices, uint32_t const num_vertices,
+                                 uint32_t const* simplices, uint32_t const num_simplices,
                                  Point<Float, N> const& x)
 {
     Float occupancy = 0.f;
@@ -139,11 +173,11 @@ Float generalized_winding_number(Float const* vertices, uint32_t num_vertices,
 }
 
 template<typename Float>
-void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
-                     uint32_t const* edges, uint32_t num_edges,
-                     Float* occupancy, uint32_t height, uint32_t width,
-                     uint32_t num_samples_per_voxel, 
-                     Filter<Float> filter)
+void voxelize_2d_cpu(Float const* vertices, uint32_t const num_vertices,
+                     uint32_t const* edges, uint32_t const num_edges,
+                     Float* occupancy, uint32_t const height, uint32_t const width,
+                     uint32_t const num_samples_per_voxel, 
+                     Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -186,19 +220,13 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
         // Splat the sample into the grid
         Point2<Float> const sample_grid_coord = Point2<Float>(Float(x), Float(y)) + sample_local;
 
-        Float filter_support[2] = {
-            filter.radius / voxel_size[0],
-            filter.radius / voxel_size[1]
-        };
+        int32_t min_coord[2];
+        int32_t max_coord[2];
+        get_grid_support<Float, 2>(sample_grid_coord, filter.radius / voxel_size, min_coord, max_coord);
 
-        int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
-        int32_t const max_x = floor(sample_grid_coord[0] + filter_support[0]);
-        int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
-        int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
-
-        for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t>(height), max_y + 1); ++ny)
+        for (int32_t ny = std::max(min_coord[1], 0); ny < std::min(static_cast<int32_t>(height), max_coord[1] + 1); ++ny)
         {
-            for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t>(width), max_x + 1); ++nx)
+            for (int32_t nx = std::max(min_coord[0], 0); nx < std::min(static_cast<int32_t>(width), max_coord[0] + 1); ++nx)
             {
                 // Compute the weight using the distance from the sample to the voxel center
                 Point2<Float> const n_center{
@@ -214,22 +242,15 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t num_vertices,
     }
 }
 
-template<typename Float, unsigned int N>
-Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
-{
-    Point<Float, N> const grid_origin(Float(-1));
-    return (x - grid_origin) / voxel_size + Point<Float,N>(Float(0));
-}
-
 // Forward-mode derivatives of the smooth indicator function
 template<typename Float>
-void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
-                             uint32_t const* edges, uint32_t num_edges,
+void voxelize_2d_forward_cpu(Float const* vertices, uint32_t const num_vertices,
+                             uint32_t const* edges, uint32_t const num_edges,
                              Float* occupancy, uint32_t const height, uint32_t const width,
                              Float const* d_vertices,
                              Float* d_occupancy,
-                             uint32_t num_samples_per_simplex, 
-                             Filter<Float> filter)
+                             uint32_t const num_samples_per_simplex, 
+                             Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -272,19 +293,13 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
             Point2<Float> const sample            = v0 + u * v0v1;
             Point2<Float> const sample_grid_coord = point_to_grid_coord(sample, voxel_size);
 
-            // TODO: Make function
-            Float const filter_support[2] = {
-                filter.radius / voxel_size[0],
-                filter.radius / voxel_size[1]};
+            int32_t min_coord[2];
+            int32_t max_coord[2];
+            get_grid_support<Float, 2>(sample_grid_coord, filter.radius / voxel_size, min_coord, max_coord);
 
-            int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
-            int32_t const max_x = floor(sample_grid_coord[0] + filter_support[0]);
-            int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
-            int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
-
-            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
+            for (int32_t ny = std::max(min_coord[1], 0); ny < std::min(static_cast<int32_t const>(height), max_coord[1] + 1); ++ny)
             {
-                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                for (int32_t nx = std::max(min_coord[0], 0); nx < std::min(static_cast<int32_t const>(width), max_coord[0] + 1); ++nx)
                 {
                     // Compute the weight using the distance from the sample to the voxel center
                     Point2<Float> const n_center{
@@ -306,13 +321,10 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t num_vertices,
 template<typename Float>
 void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
                      uint32_t const* faces, uint32_t num_faces,
-                     Float* occupancy, uint32_t depth, uint32_t height, uint32_t width,
-                     uint32_t num_samples_per_voxel, 
-                     Filter<Float> filter)
+                     Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
+                     uint32_t const num_samples_per_voxel, 
+                     Filter<Float> const filter)
 {
-    std::default_random_engine            engine(std::random_device{}());
-    std::uniform_real_distribution<Float> distribution;
-
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector3<Float> const voxel_size{
         Float(2) / width,
@@ -320,20 +332,23 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
         Float(2) / depth
     };
 
+    std::default_random_engine            engine(std::random_device{}());
+    std::uniform_real_distribution<Float> distribution;
+
     Float const voxel_volume = voxel_size[0] * voxel_size[1] * voxel_size[2];
 
     uint64_t num_samples = num_samples_per_voxel * depth * height * width;
     for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
     {
+        // Transform sample to global space
+        uint64_t const voxel_index = sample_index / num_samples_per_voxel;
+        
         // Generate sample position in voxel-local space
         Point3<Float> const sample_local{
             distribution(engine),
             distribution(engine),
             distribution(engine)
         };
-
-        // Transform sample to global space
-        uint64_t const voxel_index = sample_index / num_samples_per_voxel;
 
         // Linear indexing: voxel_index = height*width*z + width*y + x
         uint32_t const z = voxel_index / (height * width);
@@ -355,24 +370,15 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
         // Splat the sample into the grid
         Point3<Float> const sample_grid_coord = Point3<Float>(Float(x), Float(y), Float(z)) + sample_local;
 
-        Float filter_support[] = {
-            filter.radius / voxel_size[0],
-            filter.radius / voxel_size[1],
-            filter.radius / voxel_size[2],
-        };
+        int32_t min_coord[3];
+        int32_t max_coord[3];
+        get_grid_support<Float, 3>(sample_grid_coord, filter.radius / voxel_size, min_coord, max_coord);
 
-        int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
-        int32_t const max_x = floor(sample_grid_coord[0] + filter_support[0]);
-        int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
-        int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
-        int32_t const min_z = floor(sample_grid_coord[2] - filter_support[2]);
-        int32_t const max_z = floor(sample_grid_coord[2] + filter_support[2]);
-
-        for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
+        for (int32_t nz = std::max(min_coord[2], 0); nz < std::min(static_cast<int32_t const>(depth), max_coord[2] + 1); ++nz)
         {
-            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
+            for (int32_t ny = std::max(min_coord[1], 0); ny < std::min(static_cast<int32_t const>(height), max_coord[1] + 1); ++ny)
             {
-                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                for (int32_t nx = std::max(min_coord[0], 0); nx < std::min(static_cast<int32_t const>(width), max_coord[0] + 1); ++nx)
                 {
                     // Compute the weight using the distance from the sample to the voxel center
                     Point3<Float> const n_center{
@@ -393,13 +399,13 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
 
 // Forward-mode derivatives of the smooth indicator function
 template<typename Float>
-void voxelize_3d_forward_cpu(Float const* vertices, uint32_t num_vertices,
-                             uint32_t const* faces, uint32_t num_faces,
+void voxelize_3d_forward_cpu(Float const* vertices, uint32_t const num_vertices,
+                             uint32_t const* faces, uint32_t const num_faces,
                              Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
                              Float const* d_vertices,
                              Float* d_occupancy,
-                             uint32_t num_samples_per_simplex, 
-                             Filter<Float> filter)
+                             uint32_t const num_samples_per_simplex, 
+                             Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -453,25 +459,15 @@ void voxelize_3d_forward_cpu(Float const* vertices, uint32_t num_vertices,
             Point3<Float> const sample            = v0 + u * v0v1 + v * v0v2;
             Point3<Float> const sample_grid_coord = point_to_grid_coord(sample, voxel_size);
 
-            // TODO: Make function
-            Float const filter_support[3] = {
-                filter.radius / voxel_size[0],
-                filter.radius / voxel_size[1],
-                filter.radius / voxel_size[2]
-            };
+            int32_t min_coord[3];
+            int32_t max_coord[3];
+            get_grid_support<Float, 3>(sample_grid_coord, filter.radius / voxel_size, min_coord, max_coord);
 
-            int32_t const min_x = floor(sample_grid_coord[0] - filter_support[0]);
-            int32_t const max_x = floor(sample_grid_coord[0] + filter_support[0]);
-            int32_t const min_y = floor(sample_grid_coord[1] - filter_support[1]);
-            int32_t const max_y = floor(sample_grid_coord[1] + filter_support[1]);
-            int32_t const min_z = floor(sample_grid_coord[2] - filter_support[2]);
-            int32_t const max_z = floor(sample_grid_coord[2] + filter_support[2]);
-
-            for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
+            for (int32_t nz = std::max(min_coord[2], 0); nz < std::min(static_cast<int32_t const>(depth), max_coord[2] + 1); ++nz)
             {
-                for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
+                for (int32_t ny = std::max(min_coord[1], 0); ny < std::min(static_cast<int32_t const>(height), max_coord[1] + 1); ++ny)
                 {
-                    for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                    for (int32_t nx = std::max(min_coord[0], 0); nx < std::min(static_cast<int32_t const>(width), max_coord[0] + 1); ++nx)
                     {
                         // Compute the weight using the distance from the sample to the voxel center
                         Point3<Float> const n_center{
