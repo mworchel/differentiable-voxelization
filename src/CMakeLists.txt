@@ -3,6 +3,7 @@ add_library(dvx INTERFACE common.hpp
                           filter.hpp 
                           grid.hpp
                           math.hpp
+                          monte_carlo.hpp
                           winding_number.hpp)
 target_include_directories(dvx INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
