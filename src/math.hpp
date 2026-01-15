@@ -38,16 +38,6 @@ Float kahan(Float a, Float b, Float c, Float d)
         }                                                                                                                                  \
         return out;                                                                                                                        \
     }                                                                                                                                      \
-    template<typename T, typename U, unsigned int N, std::enable_if_t<!std::is_same_v<##type1##<T, N>, ##type2##<U, N>>>* = nullptr>       \
-    rtype##<decltype(std::declval<U>() op std::declval<T>()), N> operator##op##(##type2##<U, N> const& v2, type1##<T, N> const& v1)        \
-    {                                                                                                                                      \
-        rtype##<decltype(std::declval<U>() op std::declval<T>()), N> out;                                                                  \
-        for (unsigned int i = 0; i < N; i++)                                                                                               \
-        {                                                                                                                                  \
-            out[i] = v1[i] op v2[i];                                                                                                       \
-        }                                                                                                                                  \
-        return out;                                                                                                                        \
-    }                                                                                                                                      \
     template<typename T, typename U, unsigned int N,                                                                                       \
              std::enable_if_t<std::is_same_v<##type1##<T, N>, ##rtype##<decltype(std::declval<T>() op std::declval<U>()), N>>>* = nullptr> \
     type1##<T, N>& operator##op##=(type1##<T, N>& v1, ##type2##<U, N> const& v2)                                                           \
@@ -477,8 +467,11 @@ DEFINE_BINARY_OPERATOR_SCALAR(Point, /)
 DEFINE_BINARY_OPERATOR_SCALAR(Point, *)
 
 DEFINE_BINARY_OPERATOR(Point, Vector, Point, +)
+DEFINE_BINARY_OPERATOR(Vector, Point, Point, +)
 DEFINE_BINARY_OPERATOR(Point, Vector, Point, -)
+DEFINE_BINARY_OPERATOR(Vector, Point, Point, -)
 DEFINE_BINARY_OPERATOR(Point, Vector, Point, *)
+DEFINE_BINARY_OPERATOR(Vector, Point, Point, *)
 DEFINE_BINARY_OPERATOR(Point, Vector, Point, /)
 DEFINE_BINARY_OPERATOR(Point, Point, Vector, -)
 DEFINE_BINARY_OPERATOR(Point, Point, Point, +)
