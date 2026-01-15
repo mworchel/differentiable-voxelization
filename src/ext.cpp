@@ -16,6 +16,9 @@
 #include "common.hpp"
 #include "log.hpp"
 #include "math.hpp"
+#include "filter.hpp"
+#include "winding_number.hpp"
+#include "grid.hpp"
 
 namespace nb = nanobind;
 
@@ -35,142 +38,6 @@ void check_on_device(int device_type, int device_id, Array&& a, Arrays&&... arra
 namespace dvx
 {
 
-enum class FilterType
-{
-    Box = 0,
-    Gaussian
-};
-
-template<typename Float>
-struct Filter
-{
-    FilterType type;
-    Float      radius; // Filter radius in world space
-
-    template<unsigned int N>
-    DEVICE Float eval(Vector<Float, N> const& difference) const
-    {
-        switch (type)
-        {
-        case FilterType::Box:
-        {
-            bool is_inside = true;
-            for (unsigned int i = 0; i < N; ++i)
-                is_inside &= MAYBE_STD(abs)(difference[i]) < radius;
-            return Float(is_inside) / volume<N>();
-        }
-        case FilterType::Gaussian:
-        {
-            Float const distance = norm(difference);
-            constexpr Float const norm = Float(0.5 * M_SQRT1_2 * M_2_SQRTPI);
-            return Float(distance < radius) * norm * MAYBE_STD(exp)(-Float(0.5) * (distance * distance) / (2 * gaussian.stddev * gaussian.stddev));
-        }
-        default:
-            return 0;
-        }
-    }
-
-    template<unsigned int N>
-    DEVICE Float volume() const
-    {
-        switch (type)
-        {
-        case FilterType::Box:
-        {
-            if constexpr (N == 2)
-                return 4 * radius * radius;
-            if constexpr (N == 3)
-                return 8 * radius * radius * radius;
-            return 0;
-        }
-        case FilterType::Gaussian:
-        {
-            return Float(1);
-        }
-        default:
-            return 0;
-        }
-    }
-
-    union
-    {
-        struct
-        {
-        } box;
-        struct
-        {
-            Float stddev;
-        } gaussian;
-    };
-};
-
-template<typename Float, unsigned int N>
-inline Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
-{
-    Point<Float, N> const grid_origin(Float(-1));
-    return (x - grid_origin) / voxel_size + Point<Float,N>(Float(0));
-}
-
-template<typename Float, unsigned int N>
-inline void get_grid_support(Point<Float, N> const& query_coord, Vector<Float, N> const& extent, int32_t min_coord[N], int32_t max_coord[N])
-{
-    for (unsigned int i = 0; i < N; ++i)
-    {
-        min_coord[i] = query_coord[i] - extent[i];
-        max_coord[i] = query_coord[i] + extent[i];
-    }
-}
-
-template<unsigned int N>
-inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Vector<uint32_t, N> const& grid_size)
-{
-    if constexpr (N == 2)
-        return Point<uint32_t, N>(
-            /*x=*/index % grid_size[0], 
-            /*y=*/index / grid_size[0]);
-    else if constexpr (N == 2)
-        return Point<uint32_t, N>(
-            /*x=*/(index % (grid_size[0] * grid_size[1])) % grid_size[0],
-            /*y=*/(index % (grid_size[0] * grid_size[1])) / grid_size[0],
-            /*z=*/index / (grid_size[0] * grid_size[1])
-        );
-    else 
-        return Point<uint32_t, N>();
-}
-
-template<typename Float, unsigned int N>
-Float generalized_winding_number(Float const* vertices, uint32_t const num_vertices,
-                                 uint32_t const* simplices, uint32_t const num_simplices,
-                                 Point<Float, N> const& x)
-{
-    Float occupancy = 0.f;
-    for (uint32_t s = 0; s < num_simplices; ++s)
-    {
-        // Load the vertices and compute `e` vectors
-        Vector<Float, N> e[N];
-        for (int i = 0; i < N; ++i)
-        {
-            Point<Float, N> vi;
-            for (int d = 0; d < N; ++d)
-                vi[d] = vertices[N * simplices[N*s + i] + d];
-
-            e[i] = normalize(vi - x);
-        }
-
-        Float const alpha = [&e]() {
-            if constexpr (N == 2)
-                return e[0].x() * e[1].y() - e[0].y() * e[1].x();
-            else // N == 3
-                return dot(cross(e[0], e[1]), e[2]);
-        }();
-        Float const beta = ((N == 2) ? dot(e[0], e[1]) : 1 + dot(e[0], e[1]) + dot(e[1], e[2]) + dot(e[2], e[0]));
-        occupancy += atan2(alpha, beta);
-    }
-
-    Float normalization = (N == 2) ? 2 * M_PI : 0.5 * 4 * M_PI;
-
-    return occupancy / normalization;
-}
 
 template<typename Float>
 void voxelize_2d_cpu(Float const* vertices, uint32_t const num_vertices,

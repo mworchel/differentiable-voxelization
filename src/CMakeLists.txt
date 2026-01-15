@@ -1,5 +1,9 @@
 # Add the core library containing the algorithms
-add_library(dvx INTERFACE common.hpp math.hpp)
+add_library(dvx INTERFACE common.hpp 
+                          filter.hpp 
+                          grid.hpp
+                          math.hpp
+                          winding_number.hpp)
 target_include_directories(dvx INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add the Python extension
