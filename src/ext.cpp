@@ -40,11 +40,11 @@ namespace dvx
 
 
 template<typename Float>
-void voxelize_2d_cpu(Float const* vertices, uint32_t const num_vertices,
-                     uint32_t const* edges, uint32_t const num_edges,
-                     Float* occupancy, uint32_t const height, uint32_t const width,
-                     uint32_t const num_samples_per_voxel, 
-                     Filter<Float> const filter)
+void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
+                    uint32_t const* edges, uint32_t const num_edges,
+                    Float* occupancy, uint32_t const height, uint32_t const width,
+                    uint32_t const num_samples_per_voxel, 
+                    Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -111,13 +111,13 @@ void voxelize_2d_cpu(Float const* vertices, uint32_t const num_vertices,
 
 // Forward-mode derivatives of the smooth indicator function
 template<typename Float>
-void voxelize_2d_forward_cpu(Float const* vertices, uint32_t const num_vertices,
-                             uint32_t const* edges, uint32_t const num_edges,
-                             Float* occupancy, uint32_t const height, uint32_t const width,
-                             Float const* d_vertices,
-                             Float* d_occupancy,
-                             uint32_t const num_samples_per_simplex, 
-                             Filter<Float> const filter)
+void voxelize_forward_mc_2d(Float const* vertices, uint32_t const num_vertices,
+                            uint32_t const* edges, uint32_t const num_edges,
+                            Float* occupancy, uint32_t const height, uint32_t const width,
+                            Float const* d_vertices,
+                            Float* d_occupancy,
+                            uint32_t const num_samples_per_simplex, 
+                            Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -186,11 +186,11 @@ void voxelize_2d_forward_cpu(Float const* vertices, uint32_t const num_vertices,
 }
 
 template<typename Float>
-void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
-                     uint32_t const* faces, uint32_t num_faces,
-                     Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
-                     uint32_t const num_samples_per_voxel, 
-                     Filter<Float> const filter)
+void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
+                    uint32_t const* faces, uint32_t num_faces,
+                    Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
+                    uint32_t const num_samples_per_voxel, 
+                    Filter<Float> const filter)
 {
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector3<Float> const voxel_size{
@@ -266,13 +266,13 @@ void voxelize_3d_cpu(Float const* vertices, uint32_t num_vertices,
 
 // Forward-mode derivatives of the smooth indicator function
 template<typename Float>
-void voxelize_3d_forward_cpu(Float const* vertices, uint32_t const num_vertices,
-                             uint32_t const* faces, uint32_t const num_faces,
-                             Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
-                             Float const* d_vertices,
-                             Float* d_occupancy,
-                             uint32_t const num_samples_per_simplex, 
-                             Filter<Float> const filter)
+void voxelize_forward_mc_3d(Float const* vertices, uint32_t const num_vertices,
+                            uint32_t const* faces, uint32_t const num_faces,
+                            Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
+                            Float const* d_vertices,
+                            Float* d_occupancy,
+                            uint32_t const num_samples_per_simplex, 
+                            Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -409,10 +409,10 @@ void validate_common_differential_voxelize_arguments(nb::ndarray<Float, nb::c_co
 }
 
 template <typename Float>
-void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
-              nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-              nb::ndarray<Float, nb::c_contig> &occupancy,
-              uint32_t num_samples_per_voxel, Float filter_radius)
+void voxelize_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
+                 nb::ndarray<uint32_t, nb::c_contig> const &simplices,
+                 nb::ndarray<Float, nb::c_contig> &occupancy,
+                 uint32_t num_samples_per_voxel, Float filter_radius)
 {
     validate_common_voxelize_arguments(vertices, simplices, occupancy);
 
@@ -437,20 +437,21 @@ void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
     }
 
     if (dim == 2)
-        dvx::voxelize_2d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), num_samples_per_voxel, filter);
+        dvx::voxelize_mc_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                   occupancy.data(), occupancy.shape(0), occupancy.shape(1), num_samples_per_voxel, filter);
     if (dim == 3)
-        dvx::voxelize_3d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel, filter);
+        dvx::voxelize_mc_3d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                   occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel, filter);
 }
 
+
 template <typename Float>
-void voxelize_forward(nb::ndarray<Float, nb::c_contig> const &vertices,
-                      nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                      nb::ndarray<Float, nb::c_contig> &occupancy,
-                      nb::ndarray<Float, nb::c_contig> const &d_vertices,
-                      nb::ndarray<Float, nb::c_contig> &d_occupancy,
-                      uint32_t num_samples_per_simplex, Float filter_radius)
+void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
+                         nb::ndarray<uint32_t, nb::c_contig> const &simplices,
+                         nb::ndarray<Float, nb::c_contig> &occupancy /*unused*/,
+                         nb::ndarray<Float, nb::c_contig> const &d_vertices,
+                         nb::ndarray<Float, nb::c_contig> &d_occupancy,
+                         uint32_t num_samples_per_simplex, Float filter_radius)
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
@@ -461,15 +462,37 @@ void voxelize_forward(nb::ndarray<Float, nb::c_contig> const &vertices,
         .radius = filter_radius};
 
     if (dim == 2)
-        dvx::voxelize_2d_forward_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                            occupancy.data(), occupancy.shape(0), occupancy.shape(1), 
-                                            d_vertices.data(), d_occupancy.data(),
-                                            num_samples_per_simplex, filter);
+        dvx::voxelize_forward_mc_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1), 
+                                           d_vertices.data(), d_occupancy.data(),
+                                           num_samples_per_simplex, filter);
     if (dim == 3)
-        dvx::voxelize_3d_forward_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                            occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
-                                            d_vertices.data(), d_occupancy.data(),
-                                            num_samples_per_simplex, filter);
+        dvx::voxelize_forward_mc_3d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                           d_vertices.data(), d_occupancy.data(),
+                                           num_samples_per_simplex, filter);
+}
+
+template <typename Float>
+void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const &vertices,
+                       nb::ndarray<uint32_t, nb::c_contig> const &simplices,
+                       nb::ndarray<Float, nb::c_contig> &occupancy)
+{
+    validate_common_voxelize_arguments(vertices, simplices, occupancy);
+
+    // TODO: Explicit integration
+}
+
+template <typename Float>
+void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const &vertices,
+                               nb::ndarray<uint32_t, nb::c_contig> const &simplices,
+                               nb::ndarray<Float, nb::c_contig> &occupancy /*unused*/,
+                               nb::ndarray<Float, nb::c_contig> const &d_vertices,
+                               nb::ndarray<Float, nb::c_contig> &d_occupancy)
+{
+    validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
+
+    // TODO: Explicit integration
 }
 
 NB_MODULE(dvx_ext, m)
@@ -484,9 +507,11 @@ NB_MODULE(dvx_ext, m)
     m.def("mute", [=]() { suppress_warnings = true; });
     m.def("unmute", [=]() { suppress_warnings = false; });
 
-#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                             \
-    m.def("voxelize"##tag, voxelize<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                  \
-    m.def("voxelize_forward"##tag, voxelize_forward<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius"));
+#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                   \
+    m.def("voxelize_mc"##tag, voxelize_mc<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                  \
+    m.def("voxelize_forward_mc"##tag, voxelize_forward_mc<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
+    m.def("voxelize_explicit"##tag, voxelize_explicit<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                              \
+    m.def("voxelize_forward_explicit"##tag, voxelize_forward_explicit<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
 
     BIND_FUNCTIONS(float, "_f32")
     // BIND_FUNCTIONS(double, "_f64")
