@@ -491,27 +491,65 @@ void voxelize_3d_forward_cpu(Float const* vertices, uint32_t const num_vertices,
 
 } // namespace dvx
 
+template<typename Float>
+void validate_common_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const &vertices,
+                                        nb::ndarray<uint32_t, nb::c_contig> const &simplices,
+                                        nb::ndarray<Float, nb::c_contig> const &occupancy)
+{
+    unsigned int dim = static_cast<unsigned int>(occupancy.ndim());
+
+    if (dim != 2 && dim != 3)
+        throw std::invalid_argument(format_message("Expected occupancy grid with shape (h,w) or (d,h,w) but array has %d dimensions", occupancy.ndim()));
+
+    if ((occupancy.shape(0) == 0) || (occupancy.shape(1) == 0) || ((dim > 2) && (occupancy.shape(2) == 0)))
+        throw std::invalid_argument("All dimensions of the ccupancy grid must be > 0");
+
+    if (vertices.ndim() != 2)
+        throw std::invalid_argument(format_message("Expected vertices with shape (n,%d) but array has %d dimensions", dim, vertices.ndim()));
+
+    if (vertices.shape(1) != dim)
+        throw std::invalid_argument(format_message("Expected vertices with shape (n,%d) but array has shape (n,%d)", dim, vertices.shape(1)));
+
+    if (simplices.ndim() != 2)
+        throw std::invalid_argument(format_message("Expected simplices with shape (n,%d) but array has %d dimensions", dim, simplices.ndim()));
+
+    if (simplices.shape(1) != dim)
+        throw std::invalid_argument(format_message("Expected simplices with shape (n,%d) but array has shape (n,%d)", dim, simplices.shape(1)));
+
+    check_on_device(vertices.device_type(), vertices.device_id(), vertices, simplices, occupancy);
+}
+
+template<typename Float>
+void validate_common_differential_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const &vertices,
+                                                     nb::ndarray<uint32_t, nb::c_contig> const &simplices,
+                                                     nb::ndarray<Float, nb::c_contig> const &occupancy,
+                                                     nb::ndarray<Float, nb::c_contig> const &d_vertices,
+                                                     nb::ndarray<Float, nb::c_contig> const &d_occupancy)
+{
+    validate_common_voxelize_arguments(vertices, simplices, occupancy);
+
+    check_on_device(vertices.device_type(), vertices.device_id(), d_vertices, d_occupancy);
+    validate_common_voxelize_arguments(d_vertices, simplices, d_occupancy);
+
+    if (occupancy.ndim() != d_occupancy.ndim())
+        throw std::invalid_argument(format_message("Dimension mismatch between `occupancy` (dim=%d) and `d_occupancy` (dim=%d)", occupancy.ndim(), d_occupancy.ndim()));
+
+    for (size_t i = 0; i < occupancy.ndim(); ++i)
+    {
+        if (occupancy.shape(i) != d_occupancy.shape(i))
+            throw std::invalid_argument(format_message("Shape mismatch in dimension `%d` between `occupancy` (=%d) and `d_occupancy` (=%d)", i, occupancy.shape(i), d_occupancy.shape(i)));
+    }
+}
+
 template <typename Float>
 void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
               nb::ndarray<uint32_t, nb::c_contig> const &simplices,
               nb::ndarray<Float, nb::c_contig> &occupancy,
               uint32_t num_samples_per_voxel, Float filter_radius)
 {
-    if (vertices.ndim() != 2 || (vertices.shape(1) != 2 && vertices.shape(1) != 3))
-        throw std::invalid_argument(format_message("Expected vertices with shape (n,2) or (n,3) but array has %d dimensions", vertices.ndim()));
+    validate_common_voxelize_arguments(vertices, simplices, occupancy);
 
-    if (simplices.ndim() != 2 || (simplices.shape(1) != 2 && simplices.shape(1) != 3))
-        throw std::invalid_argument(format_message("Expected simplices with shape (n,2) or (n,3) but array has %d dimensions", simplices.ndim()));
-
-    if (vertices.shape(1) != simplices.shape(1))
-        throw std::invalid_argument(format_message("Expected vertices (dim=%d) and simplices (dim=%d) with same dimension", vertices.shape(1), simplices.shape(1)));
-
-    if (occupancy.ndim() != 2 && occupancy.ndim() != 3)
-        throw std::invalid_argument(format_message("Expected occupancy grid with shape (h,w) or (d,h,w) but array has %d dimensions", occupancy.ndim()));
-
-    check_on_device(vertices.device_type(), vertices.device_id(), vertices, simplices, occupancy);
-
-    unsigned int N = vertices.shape(1);
+    unsigned int dim = vertices.shape(1);
 
     dvx::Filter<Float> filter{
         .type   = dvx::FilterType::Box,
@@ -519,7 +557,7 @@ void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
 
     if (!suppress_warnings && num_samples_per_voxel < 16)
     {
-        for (int i = 0; i < N; ++i)
+        for (int i = 0; i < dim; ++i)
         {
             Float voxel_spacing = Float(2) / occupancy.shape(i);
             if (filter.radius < voxel_spacing)
@@ -531,10 +569,10 @@ void voxelize(nb::ndarray<Float, nb::c_contig> const &vertices,
         }
     }
 
-    if (vertices.shape(1) == 2)
+    if (dim == 2)
         dvx::voxelize_2d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                     occupancy.data(), occupancy.shape(0), occupancy.shape(1), num_samples_per_voxel, filter);
-    if (vertices.shape(1) == 3)
+    if (dim == 3)
         dvx::voxelize_3d_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                     occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel, filter);
 }
@@ -547,32 +585,20 @@ void voxelize_forward(nb::ndarray<Float, nb::c_contig> const &vertices,
                       nb::ndarray<Float, nb::c_contig> &d_occupancy,
                       uint32_t num_samples_per_simplex, Float filter_radius)
 {
-    if (vertices.ndim() != 2 || (vertices.shape(1) != 2 && vertices.shape(1) != 3))
-        throw std::invalid_argument(format_message("Expected vertices with shape (n,2) or (n,3) but array has %d dimensions", vertices.ndim()));
+    validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
-    if (simplices.ndim() != 2 || (simplices.shape(1) != 2 && simplices.shape(1) != 3))
-        throw std::invalid_argument(format_message("Expected simplices with shape (n,2) or (n,3) but array has %d dimensions", simplices.ndim()));
-
-    if (vertices.shape(1) != simplices.shape(1))
-        throw std::invalid_argument(format_message("Expected vertices (dim=%d) and simplices (dim=%d) with same dimension", vertices.shape(1), simplices.shape(1)));
-
-    if (occupancy.ndim() != 2 && occupancy.ndim() != 3)
-        throw std::invalid_argument(format_message("Expected occupancy grid with shape (h,w) or (d,h,w) but array has %d dimensions", occupancy.ndim()));
-
-    check_on_device(vertices.device_type(), vertices.device_id(), vertices, simplices, occupancy);
-
-    unsigned int N = vertices.shape(1);
+    unsigned int dim = vertices.shape(1);
 
     dvx::Filter<Float> filter{
         .type   = dvx::FilterType::Box,
         .radius = filter_radius};
 
-    if (vertices.shape(1) == 2)
+    if (dim == 2)
         dvx::voxelize_2d_forward_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                             occupancy.data(), occupancy.shape(0), occupancy.shape(1), 
                                             d_vertices.data(), d_occupancy.data(),
                                             num_samples_per_simplex, filter);
-    if (vertices.shape(1) == 3)
+    if (dim == 3)
         dvx::voxelize_3d_forward_cpu<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                             occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
                                             d_vertices.data(), d_occupancy.data(),
@@ -591,6 +617,10 @@ NB_MODULE(dvx_ext, m)
     m.def("mute", [=]() { suppress_warnings = true; });
     m.def("unmute", [=]() { suppress_warnings = false; });
 
-    m.def("voxelize_f32", voxelize<float>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));
-    m.def("voxelize_forward_f32", voxelize_forward<float>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius"));
+#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                             \
+    m.def("voxelize"##tag, voxelize<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                  \
+    m.def("voxelize_forward"##tag, voxelize_forward<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius"));
+
+    BIND_FUNCTIONS(float, "_f32")
+    // BIND_FUNCTIONS(double, "_f64")
 }
