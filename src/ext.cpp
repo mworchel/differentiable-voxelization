@@ -48,7 +48,7 @@ struct Filter
     Float      radius; // Filter radius in world space
 
     template<unsigned int N>
-    DEVICE Float eval(Vector<Float, N> const& difference)
+    DEVICE Float eval(Vector<Float, N> const& difference) const
     {
         switch (type)
         {
@@ -71,8 +71,9 @@ struct Filter
     }
 
     template<unsigned int N>
-    DEVICE Float volume()
-    {        switch (type)
+    DEVICE Float volume() const
+    {
+        switch (type)
         {
         case FilterType::Box:
         {
