@@ -128,11 +128,11 @@ Float generalized_winding_number(Float const* vertices, uint32_t num_vertices,
             else // N == 3
                 return dot(cross(e[0], e[1]), e[2]);
         }();
-        Float const beta  = ((N == 2) ? dot(e[0], e[1]) : 1 + dot(e[0], e[1]) + dot(e[1], e[2]) + dot(e[2], e[0]));
+        Float const beta = ((N == 2) ? dot(e[0], e[1]) : 1 + dot(e[0], e[1]) + dot(e[1], e[2]) + dot(e[2], e[0]));
         occupancy += atan2(alpha, beta);
     }
 
-    Float normalization = (N == 2) ? 2 * M_PI : 4 * M_PI;
+    Float normalization = (N == 2) ? 2 * M_PI : 0.5 * 4 * M_PI;
 
     return occupancy / normalization;
 }
