@@ -404,7 +404,7 @@ void d_voxelize_mc_3d(Float const* vertices, uint32_t const num_vertices,
                                 d_occupancy[n_voxel_index] += d_xbn * filter_weight * area / Float(num_samples_per_simplex);
                             else // (Mode == DifferentiationMode::Backward)
                             {
-                                Float const differential_weight = filter_weight * area / Float(num_samples_per_simplex);
+                                Float const differential_weight = d_occupancy[n_voxel_index] * filter_weight * area / Float(num_samples_per_simplex);
                                 for (int d = 0; d < 3; ++d)
                                 {
                                     d_vertices[3 * v0_idx + d] += d_xbn_d_v0[d] * differential_weight;
