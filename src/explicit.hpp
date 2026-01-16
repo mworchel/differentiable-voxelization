@@ -346,7 +346,7 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
                             Vector<Float, 3> const& pv0     = poly_xyz[0];
                             Vector<Float, 3>        contrib = Vector<Float, 3>(Float(0));
 
-                            const Float pivot = poly_dvn[0] / Float(3);
+                            const Vector<Float, 3> pivot = poly_bary[0] / Float(3);
                             for (size_t vi = 1; vi < poly_xyz.size() - 1; ++vi)
                             {
                                 Vector<Float, 3> const& pv1 = poly_xyz[vi];
