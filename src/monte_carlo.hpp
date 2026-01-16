@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <random>
 
+#include "aabb.hpp"
 #include "common.hpp"
 #include "filter.hpp"
 #include "grid.hpp"
@@ -155,6 +156,8 @@ void voxelize_forward_mc_2d(Float const* vertices, uint32_t const num_vertices,
     }
 }
 
+#define DVX_MC_PRIMAL_ADAPTIVE_SAMPLING 1
+
 template<typename Float>
 void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     uint32_t const* faces, uint32_t num_faces,
@@ -168,6 +171,51 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         Float(2) / height,
         Float(2) / depth};
 
+#if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
+    // Tag near-surface voxels using the axis-aligned bounding box
+    Bitset mask(depth * height * width);
+    for (uint32_t face_index = 0; face_index < num_faces; ++face_index)
+    {
+        Point3<uint32_t> const face(&faces[3 * face_index]);
+
+        Point3<Float> const v0(&vertices[3 * face[0]]);
+        Point3<Float> const v1(&vertices[3 * face[1]]);
+        Point3<Float> const v2(&vertices[3 * face[2]]);
+
+        AABB3<Float> aabb;
+        aabb.extend(v0);
+        aabb.extend(v1);
+        aabb.extend(v2);
+
+        //
+        aabb.min -= Vector3<Float>(filter.radius);
+        aabb.max += Vector3<Float>(filter.radius);
+
+        Point3<Float> const min_grid_coord = point_to_grid_coord(aabb.min, voxel_size);
+        Point3<Float> const max_grid_coord = point_to_grid_coord(aabb.max, voxel_size);
+
+        int32_t const min_x = floor(min_grid_coord[0]);
+        int32_t const max_x = floor(max_grid_coord[0]);
+        int32_t const min_y = floor(min_grid_coord[1]);
+        int32_t const max_y = floor(max_grid_coord[1]);
+        int32_t const min_z = floor(min_grid_coord[2]);
+        int32_t const max_z = floor(max_grid_coord[2]);
+
+        for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
+        {
+            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
+            {
+                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                {
+                    uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
+                    mask.set(n_voxel_index);
+                    // occupancy[n_voxel_index] = Float(1);
+                }
+            }
+        }
+    }
+#endif
+
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
 
@@ -178,6 +226,16 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
     {
         // Transform sample to global space
         uint64_t const voxel_index = sample_index / num_samples_per_voxel;
+
+#if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
+        // Only use a single sample for voxels that are not near the surface
+        bool const     is_constant_voxel      = !mask.is_set(voxel_index);
+        uint32_t const num_samples_this_voxel = is_constant_voxel ? 1u : num_samples_per_voxel;
+        if (is_constant_voxel && (sample_index % num_samples_per_voxel) > 0)
+            continue;
+#else
+        uint32_t const num_samples_this_voxel = num_samples_per_voxel;
+#endif
 
         // Generate sample position in voxel-local space
         Point3<Float> const sample_local{
@@ -223,7 +281,7 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     Float const    filter_weight = filter.eval(n_center - sample);
                     uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
                     if (filter_weight > 0)
-                        occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_per_voxel;
+                        occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_this_voxel;
                 }
             }
         }
