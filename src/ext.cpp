@@ -212,7 +212,9 @@ void voxelize_backward_explicit(nb::ndarray<Float, nb::c_contig> const&    verti
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
-    throw std::invalid_argument("Not implemented.");
+    dvx::voxelize_explicit_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                           d_vertices.data(), d_occupancy.data());
 }
 
 NB_MODULE(dvx_ext, m)
