@@ -5,6 +5,7 @@
 #include <random>
 
 #include "aabb.hpp"
+#include "bitset.hpp"
 #include "common.hpp"
 #include "filter.hpp"
 #include "grid.hpp"
