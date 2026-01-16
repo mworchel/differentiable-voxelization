@@ -11,6 +11,7 @@
 
 #include "common.hpp"
 #include "math.hpp"
+#include "differentiation.hpp"
 
 namespace nb = nanobind;
 namespace dvx
@@ -83,12 +84,12 @@ void split_polygon_bary(std::vector<Vector<Float, 3>> const& polygon_bary,
     }
 }
 
-template<typename Float, bool primal, bool forward>
+template<typename Float, bool primal, DifferentiationMode Mode>
 void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_vertices,
                                    uint32_t const* faces, uint32_t const num_faces,
                                    Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
-                                   Float const* d_vertices,
-                                   Float*       d_occupancy)
+                                   dIn<Float, Mode>*   d_vertices,
+                                   dOut<Float, Mode>*  d_occupancy)
 {
     const Float step_x      = Float(2) / depth;
     const Float step_y      = Float(2) / height;
@@ -122,8 +123,9 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
 
         // for primal only
         Float sign_nz;
-        // for forward only
+        // for differential only
         Vector<Float, 3> dvn_vec;
+        Vector<Float, 3> normal;
 
         if constexpr (primal)
         {
@@ -137,8 +139,9 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
         else
         {
             // Compute normal
-            const Vector<Float, 3> normal     = cross(e1, e2);
-            const Float            normal_len = norm(normal);
+            normal = cross(e1, e2);
+
+            const Float normal_len = norm(normal);
 
             // Area of triangle is zero, skip
             if (normal_len < Float(1e-12))
@@ -150,10 +153,20 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
             const Vector<Float, 3> dv1(&d_vertices[i1 * 3]);
             const Vector<Float, 3> dv2(&d_vertices[i2 * 3]);
 
-            // Compute dvn (derivative projected onto normal direction)
-            dvn_vec[0] = dot(dv0, unit_normal);
-            dvn_vec[1] = dot(dv1, unit_normal);
-            dvn_vec[2] = dot(dv2, unit_normal);
+            if constexpr (Mode == DifferentiationMode::Backward)
+            {
+                // Compute dvn (derivative projected onto normal direction)
+                dvn_vec[0] = unit_normal[0];
+                dvn_vec[1] = unit_normal[1];
+                dvn_vec[2] = unit_normal[2];
+            }
+            else
+            {
+                // Compute dvn (derivative projected onto normal direction)
+                dvn_vec[0] = dot(dv0, unit_normal);
+                dvn_vec[1] = dot(dv1, unit_normal);
+                dvn_vec[2] = dot(dv2, unit_normal);
+            }
         }
 
         // Bounding box in grid coordinates
@@ -298,33 +311,64 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
                     }
                     else
                     {
-                        poly_dvn.clear();
-                        for (auto const& bary : poly_bary)
-                        {
-                            poly_dvn.push_back(dot(bary, dvn_vec));
-                        }
-                        // This cell gets partial contribution
-                        Vector<Float, 3> const& pv0     = poly_xyz[0];
-                        Float                   contrib = Float(0);
-
-                        const Float pivot = poly_dvn[0] / Float(3);
-                        for (size_t vi = 1; vi < poly_xyz.size() - 1; ++vi)
-                        {
-                            Vector<Float, 3> const& pv1 = poly_xyz[vi];
-                            Vector<Float, 3> const& pv2 = poly_xyz[vi + 1];
-
-                            const Vector<Float, 3> edge1    = pv1 - pv0;
-                            const Vector<Float, 3> edge2    = pv2 - pv0;
-                            const Float            sub_area = Float(0.5) * norm(cross(edge1, edge2));
-
-                            const Float b1 = poly_dvn[vi] / Float(3);
-                            const Float b2 = poly_dvn[vi + 1] / Float(3);
-
-                            contrib += sub_area * (pivot + b1 + b2);
-                        }
-
                         const size_t idx = static_cast<size_t>(i * height * width + j * width + k);
-                        d_occupancy[idx] += contrib / cell_volume;
+                        if constexpr (Mode == DifferentiationMode::Forward)
+                        {
+                            poly_dvn.clear();
+                            for (auto const& bary : poly_bary)
+                            {
+                                poly_dvn.push_back(dot(bary, dvn_vec));
+                            }
+                            // This cell gets partial contribution
+                            Vector<Float, 3> const& pv0     = poly_xyz[0];
+                            Float                   contrib = Float(0);
+
+                            const Float pivot = poly_dvn[0] / Float(3);
+                            for (size_t vi = 1; vi < poly_xyz.size() - 1; ++vi)
+                            {
+                                Vector<Float, 3> const& pv1 = poly_xyz[vi];
+                                Vector<Float, 3> const& pv2 = poly_xyz[vi + 1];
+
+                                const Vector<Float, 3> edge1    = pv1 - pv0;
+                                const Vector<Float, 3> edge2    = pv2 - pv0;
+                                const Float            sub_area = Float(0.5) * norm(cross(edge1, edge2));
+
+                                const Float b1 = poly_dvn[vi] / Float(3);
+                                const Float b2 = poly_dvn[vi + 1] / Float(3);
+
+                                contrib += sub_area * (pivot + b1 + b2);
+                            }
+                            d_occupancy[idx] += contrib / cell_volume;
+                        }
+                        else
+                        {
+                            // This cell gets partial contribution
+                            Vector<Float, 3> const& pv0     = poly_xyz[0];
+                            Vector<Float, 3>        contrib = Vector<Float, 3>(Float(0));
+
+                            const Float pivot = poly_dvn[0] / Float(3);
+                            for (size_t vi = 1; vi < poly_xyz.size() - 1; ++vi)
+                            {
+                                Vector<Float, 3> const& pv1 = poly_xyz[vi];
+                                Vector<Float, 3> const& pv2 = poly_xyz[vi + 1];
+
+                                const Vector<Float, 3> edge1    = pv1 - pv0;
+                                const Vector<Float, 3> edge2    = pv2 - pv0;
+                                const Float            sub_area = Float(0.5) * norm(cross(edge1, edge2));
+
+                                const Vector<Float, 3> b1 = poly_bary[vi] / Float(3);
+                                const Vector<Float, 3> b2 = poly_bary[vi + 1] / Float(3);
+
+                                contrib += sub_area * (pivot + b1 + b2);
+                            }
+                            Float const differential_weight = d_occupancy[idx] / cell_volume;
+                            for (int d = 0; d < 3; ++d)
+                            {
+                                d_vertices[3 * i0 + d] += contrib[d] * dvn_vec[d] * differential_weight;
+                                d_vertices[3 * i1 + d] += contrib[d] * dvn_vec[d] * differential_weight;
+                                d_vertices[3 * i2 + d] += contrib[d] * dvn_vec[d] * differential_weight;
+                            }
+                        }
                     }
                 }
             }
@@ -336,7 +380,7 @@ void voxelize_explicit(Float const* vertices, uint32_t const num_vertices,
                        uint32_t const* faces, uint32_t const num_faces,
                        Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width)
 {
-    return voxelize_explicit_generalized<Float, true, false>(vertices, num_vertices,
+    return voxelize_explicit_generalized<Float, true, DifferentiationMode::Forward>(vertices, num_vertices,
                                                              faces, num_faces,
                                                              occupancy, depth, height, width,
                                                              NULL,
@@ -350,7 +394,21 @@ void voxelize_explicit_forward(Float const* vertices, uint32_t const num_vertice
                                Float const* d_vertices,
                                Float*       d_occupancy)
 {
-    return voxelize_explicit_generalized<Float, false, true>(vertices, num_vertices,
+    return voxelize_explicit_generalized<Float, false, DifferentiationMode::Forward>(vertices, num_vertices,
+                                                             faces, num_faces,
+                                                             occupancy, depth, height, width,
+                                                             d_vertices,
+                                                             d_occupancy);
+}
+
+template<typename Float>
+void voxelize_explicit_backward(Float const* vertices, uint32_t const num_vertices,
+                               uint32_t const* faces, uint32_t const num_faces,
+                               Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
+                               Float* d_vertices,
+                               Float const*       d_occupancy)
+{
+    return voxelize_explicit_generalized<Float, false, DifferentiationMode::Backward>(vertices, num_vertices,
                                                              faces, num_faces,
                                                              occupancy, depth, height, width,
                                                              d_vertices,
