@@ -123,12 +123,21 @@ void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         for (uint32_t sample_index = 0; sample_index < num_samples_per_simplex; ++sample_index)
         {
             Float const u = distribution(engine);
-            // x_b = (1-u) * v0 + u * v1 = v0 + u * (v1 - v0)
-            Vector2<Float> const d_v0(&d_vertices[2 * v0_idx]);
-            Vector2<Float> const d_v1(&d_vertices[2 * v1_idx]);
 
-            Float const xb0 = dot(d_v0, normal * (1 - u));
-            Float const xb1 = dot(d_v1, normal * u);
+            // Compute normal velocities for all vertices
+            Vector2<Float> const d_xbn_d_v0 = normal * (1 - u);
+            Vector2<Float> const d_xbn_d_v1 = normal * u;
+
+            // Compute normal velocity for theta in forward mode
+            [[maybe_unused]] Float d_xbn = 0; // Unused in backward
+            if constexpr (Mode == DifferentiationMode::Forward)
+            {
+                // x_b = (1-u) * v0 + u * v1 = v0 + u * (v1 - v0)
+                Vector2<Float> const d_v0(&d_vertices[2 * v0_idx]);
+                Vector2<Float> const d_v1(&d_vertices[2 * v1_idx]);
+                d_xbn += dot(d_v0, d_xbn_d_v0);
+                d_xbn += dot(d_v1, d_xbn_d_v1);
+            }
 
             Point2<Float> const sample            = v0 + u * v0v1;
             Point2<Float> const sample_grid_coord = point_to_grid_coord(sample, voxel_size);
@@ -151,7 +160,16 @@ void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     if (filter_weight != Float(0))
                     {
                         if constexpr (Mode == DifferentiationMode::Forward)
-                            d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1) * area / Float(num_samples_per_simplex); // TODO: the normalization is incorrect
+                            d_occupancy[n_voxel_index] += d_xbn * filter_weight * area / Float(num_samples_per_simplex);
+                        else // (Mode == DifferentiationMode::Backward)
+                        {
+                            Float const differential_weight = d_occupancy[n_voxel_index] * filter_weight * area / Float(num_samples_per_simplex);
+                            for (int d = 0; d < 2; ++d)
+                            {
+                                d_vertices[2 * v0_idx + d] += d_xbn_d_v0[d] * differential_weight;
+                                d_vertices[2 * v1_idx + d] += d_xbn_d_v1[d] * differential_weight;
+                            }
+                        }
                     }
                 }
             }
@@ -340,14 +358,24 @@ void d_voxelize_mc_3d(Float const* vertices, uint32_t const num_vertices,
                 u = 1 - u;
                 v = 1 - v;
             }
-            // x_b = (1-u-v) * v0 + u * v1 + v * v2 = v0 + u * (v1 - v0) + v * (v2 - v0)
-            Vector3<Float> const d_v0{d_vertices[3 * v0_idx + 0], d_vertices[3 * v0_idx + 1], d_vertices[3 * v0_idx + 2]};
-            Vector3<Float> const d_v1{d_vertices[3 * v1_idx + 0], d_vertices[3 * v1_idx + 1], d_vertices[3 * v1_idx + 2]};
-            Vector3<Float> const d_v2{d_vertices[3 * v2_idx + 0], d_vertices[3 * v2_idx + 1], d_vertices[3 * v2_idx + 2]};
 
-            Float const xb0 = dot(d_v0, normal * (1 - u - v));
-            Float const xb1 = dot(d_v1, normal * u);
-            Float const xb2 = dot(d_v2, normal * v);
+            // Compute normal velocities for all vertices
+            Vector3<Float> const d_xbn_d_v0 = normal * (1 - u - v);
+            Vector3<Float> const d_xbn_d_v1 = normal * u;
+            Vector3<Float> const d_xbn_d_v2 = normal * v;
+
+            // Compute normal velocity for theta in forward mode
+            [[maybe_unused]] Float d_xbn = 0; // Unused in backward
+            if constexpr (Mode == DifferentiationMode::Forward)
+            {
+                // x_b = (1-u-v) * v0 + u * v1 + v * v2 = v0 + u * (v1 - v0) + v * (v2 - v0)
+                Vector3<Float> const d_v0{d_vertices[3 * v0_idx + 0], d_vertices[3 * v0_idx + 1], d_vertices[3 * v0_idx + 2]};
+                Vector3<Float> const d_v1{d_vertices[3 * v1_idx + 0], d_vertices[3 * v1_idx + 1], d_vertices[3 * v1_idx + 2]};
+                Vector3<Float> const d_v2{d_vertices[3 * v2_idx + 0], d_vertices[3 * v2_idx + 1], d_vertices[3 * v2_idx + 2]};
+                d_xbn += dot(d_v0, d_xbn_d_v0);
+                d_xbn += dot(d_v1, d_xbn_d_v1);
+                d_xbn += dot(d_v2, d_xbn_d_v2);
+            }
 
             Point3<Float> const sample            = v0 + u * v0v1 + v * v0v2;
             Point3<Float> const sample_grid_coord = point_to_grid_coord(sample, voxel_size);
@@ -373,7 +401,17 @@ void d_voxelize_mc_3d(Float const* vertices, uint32_t const num_vertices,
                         if (filter_weight != Float(0))
                         {
                             if constexpr (Mode == DifferentiationMode::Forward)
-                                d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1 + xb2) * area / Float(num_samples_per_simplex);
+                                d_occupancy[n_voxel_index] += d_xbn * filter_weight * area / Float(num_samples_per_simplex);
+                            else // (Mode == DifferentiationMode::Backward)
+                            {
+                                Float const differential_weight = filter_weight * area / Float(num_samples_per_simplex);
+                                for (int d = 0; d < 3; ++d)
+                                {
+                                    d_vertices[3 * v0_idx + d] += d_xbn_d_v0[d] * differential_weight;
+                                    d_vertices[3 * v1_idx + d] += d_xbn_d_v1[d] * differential_weight;
+                                    d_vertices[3 * v2_idx + d] += d_xbn_d_v2[d] * differential_weight;
+                                }
+                            }
                         }
                     }
                 }
