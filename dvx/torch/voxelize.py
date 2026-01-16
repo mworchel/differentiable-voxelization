@@ -67,7 +67,8 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
         Vertices of the 2D polygon as (V,2) or the 3D triangle mesh as (V,3).
     indices : torch.Tensor
         Index array, in 2D with shape (F,2) and in 3D with shape (F,3)
-    
+    method : str
+        The integration method, one of ['mc', 'explicit', 'auto']. Default: 'auto'.
     filter_radius : Optional[float]
         Radius of the filter, by default the size of half a voxel.
 
