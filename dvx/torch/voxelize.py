@@ -83,9 +83,11 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
     half_voxel_size = 0.5 * (2 / n)
     if filter_radius is None:
         filter_radius = half_voxel_size
+    elif method == 'explicit' and not math.isclose(half_voxel_size, filter_radius):
+        print(f"Warning: Integration mode 'explicit' implicitly assumes a box filter the size of a voxel (={half_voxel_size}). The given filter radius (={filter_radius}) has no effect.")
 
     if method == 'auto':
-        method = 'explicit' if math.isclose(half_voxel_size, filter_radius) else 'mc'
+        method = 'explicit' if math.isclose(half_voxel_size, filter_radius) else 'mc'    
 
     primal_params = {}
     backward_params = {}
