@@ -7,6 +7,7 @@
 #include "aabb.hpp"
 #include "bitset.hpp"
 #include "common.hpp"
+#include "differentiation.hpp"
 #include "filter.hpp"
 #include "grid.hpp"
 #include "winding_number.hpp"
@@ -83,14 +84,14 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
 }
 
 // Forward-mode derivatives of the smooth indicator function
-template<typename Float>
-void voxelize_forward_mc_2d(Float const* vertices, uint32_t const num_vertices,
-                            uint32_t const* edges, uint32_t const num_edges,
-                            Float* occupancy, uint32_t const height, uint32_t const width,
-                            Float const*        d_vertices,
-                            Float*              d_occupancy,
-                            uint32_t const      num_samples_per_simplex,
-                            Filter<Float> const filter)
+template<typename Float, DifferentiationMode Mode>
+void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
+                      uint32_t const* edges, uint32_t const num_edges,
+                      Float* occupancy, uint32_t const height, uint32_t const width,
+                      dIn<Float, Mode>*   d_vertices,
+                      dOut<Float, Mode>*  d_occupancy,
+                      uint32_t const      num_samples_per_simplex,
+                      Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -149,7 +150,8 @@ void voxelize_forward_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     uint64_t const n_voxel_index = width * ny + nx;
                     if (filter_weight != Float(0))
                     {
-                        d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1) * area / Float(num_samples_per_simplex); // TODO: the normalization is incorrect
+                        if constexpr (Mode == DifferentiationMode::Forward)
+                            d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1) * area / Float(num_samples_per_simplex); // TODO: the normalization is incorrect
                     }
                 }
             }
@@ -290,14 +292,14 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
 }
 
 // Forward-mode derivatives of the smooth indicator function
-template<typename Float>
-void voxelize_forward_mc_3d(Float const* vertices, uint32_t const num_vertices,
-                            uint32_t const* faces, uint32_t const num_faces,
-                            Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
-                            Float const*        d_vertices,
-                            Float*              d_occupancy,
-                            uint32_t const      num_samples_per_simplex,
-                            Filter<Float> const filter)
+template<typename Float, DifferentiationMode Mode>
+void d_voxelize_mc_3d(Float const* vertices, uint32_t const num_vertices,
+                      uint32_t const* faces, uint32_t const num_faces,
+                      Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
+                      dIn<Float, Mode>*   d_vertices,
+                      dOut<Float, Mode>*  d_occupancy,
+                      uint32_t const      num_samples_per_simplex,
+                      Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -370,7 +372,8 @@ void voxelize_forward_mc_3d(Float const* vertices, uint32_t const num_vertices,
                         uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
                         if (filter_weight != Float(0))
                         {
-                            d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1 + xb2) * area / Float(num_samples_per_simplex);
+                            if constexpr (Mode == DifferentiationMode::Forward)
+                                d_occupancy[n_voxel_index] += filter_weight * (xb0 + xb1 + xb2) * area / Float(num_samples_per_simplex);
                         }
                     }
                 }

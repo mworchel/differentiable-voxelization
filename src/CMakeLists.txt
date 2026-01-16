@@ -1,5 +1,6 @@
 # Add the core library containing the algorithms
 add_library(dvx INTERFACE common.hpp 
+                          differentiation.hpp
                           filter.hpp 
                           grid.hpp
                           math.hpp

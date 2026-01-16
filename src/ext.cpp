@@ -138,15 +138,15 @@ void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
         .radius = filter_radius};
 
     if (dim == 2)
-        dvx::voxelize_forward_mc_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1),
-                                           d_vertices.data(), d_occupancy.data(),
-                                           num_samples_per_simplex, filter);
+        dvx::d_voxelize_mc_2d<Float, dvx::DifferentiationMode::Forward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                                                        occupancy.data(), occupancy.shape(0), occupancy.shape(1),
+                                                                        d_vertices.data(), d_occupancy.data(),
+                                                                        num_samples_per_simplex, filter);
     if (dim == 3)
-        dvx::voxelize_forward_mc_3d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
-                                           d_vertices.data(), d_occupancy.data(),
-                                           num_samples_per_simplex, filter);
+        dvx::d_voxelize_mc_3d<Float, dvx::DifferentiationMode::Forward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                                                        occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                                                        d_vertices.data(), d_occupancy.data(),
+                                                                        num_samples_per_simplex, filter);
 }
 
 template<typename Float>
@@ -165,7 +165,16 @@ void voxelize_backward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
         .type   = dvx::FilterType::Box,
         .radius = filter_radius};
 
-    throw std::invalid_argument("Not implemented.");
+    if (dim == 2)
+        dvx::d_voxelize_mc_2d<Float, dvx::DifferentiationMode::Backward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                                                         occupancy.data(), occupancy.shape(0), occupancy.shape(1),
+                                                                         d_vertices.data(), d_occupancy.data(),
+                                                                         num_samples_per_simplex, filter);
+    if (dim == 3)
+        dvx::d_voxelize_mc_3d<Float, dvx::DifferentiationMode::Backward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                                                         occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                                                         d_vertices.data(), d_occupancy.data(),
+                                                                         num_samples_per_simplex, filter);
 }
 
 template<typename Float>
