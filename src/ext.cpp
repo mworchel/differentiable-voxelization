@@ -149,6 +149,25 @@ void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
                                            num_samples_per_simplex, filter);
 }
 
+template<typename Float>
+void voxelize_backward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                          nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                          nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
+                          nb::ndarray<Float, nb::c_contig>&          d_vertices,
+                          nb::ndarray<Float, nb::c_contig> const&    d_occupancy,
+                          uint32_t num_samples_per_simplex, Float filter_radius)
+{
+    validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
+
+    unsigned int dim = vertices.shape(1);
+
+    dvx::Filter<Float> filter{
+        .type   = dvx::FilterType::Box,
+        .radius = filter_radius};
+
+    throw std::invalid_argument("Not implemented.");
+}
+
 template <typename Float>
 void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const &vertices,
                        nb::ndarray<uint32_t, nb::c_contig> const &simplices,
@@ -171,6 +190,18 @@ void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const &vertices,
     // TODO: Explicit integration
 }
 
+template<typename Float>
+void voxelize_backward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                                nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                                nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
+                                nb::ndarray<Float, nb::c_contig>&          d_vertices,
+                                nb::ndarray<Float, nb::c_contig> const&    d_occupancy)
+{
+    validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
+
+    throw std::invalid_argument("Not implemented.");
+}
+
 NB_MODULE(dvx_ext, m)
 {
 #if NDEBUG
@@ -183,12 +214,14 @@ NB_MODULE(dvx_ext, m)
     m.def("mute", [=]() { suppress_warnings = true; });
     m.def("unmute", [=]() { suppress_warnings = false; });
 
-#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                   \
-    m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                  \
-    m.def("voxelize_forward_mc" tag, voxelize_forward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
-    m.def("voxelize_explicit" tag, voxelize_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                              \
-    m.def("voxelize_forward_explicit" tag, voxelize_forward_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
+#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                \
+    m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                    \
+    m.def("voxelize_forward_mc" tag, voxelize_forward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius"));   \
+    m.def("voxelize_backward_mc" tag, voxelize_backward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
+    m.def("voxelize_explicit" tag, voxelize_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                    \
+    m.def("voxelize_forward_explicit" tag, voxelize_forward_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));                                                     \
+    m.def("voxelize_backward_explicit" tag, voxelize_backward_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
 
     BIND_FUNCTIONS(float, "_f32")
-    // BIND_FUNCTIONS(double, "_f64")
+    BIND_FUNCTIONS(double, "_f64")
 }
