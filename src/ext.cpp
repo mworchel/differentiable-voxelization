@@ -1,9 +1,9 @@
 #include <algorithm>
-#include <limits>
+#include <cstdint>
 #include <functional>
+#include <limits>
 #include <random>
 #include <stdexcept>
-#include <cstdint>
 #define _USE_MATH_DEFINES
 #include <cmath>
 
@@ -14,6 +14,7 @@
 #include <nanobind/stl/vector.h>
 
 #include "common.hpp"
+#include "explicit.hpp"
 #include "filter.hpp"
 #include "log.hpp"
 #include "math.hpp"
@@ -35,9 +36,9 @@ void check_on_device(int device_type, int device_id, Array&& a, Arrays&&... arra
 }
 
 template<typename Float>
-void validate_common_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const &vertices,
-                                        nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                                        nb::ndarray<Float, nb::c_contig> const &occupancy)
+void validate_common_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                                        nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                                        nb::ndarray<Float, nb::c_contig> const&    occupancy)
 {
     unsigned int dim = static_cast<unsigned int>(occupancy.ndim());
 
@@ -63,11 +64,11 @@ void validate_common_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const &
 }
 
 template<typename Float>
-void validate_common_differential_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const &vertices,
-                                                     nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                                                     nb::ndarray<Float, nb::c_contig> const &occupancy,
-                                                     nb::ndarray<Float, nb::c_contig> const &d_vertices,
-                                                     nb::ndarray<Float, nb::c_contig> const &d_occupancy)
+void validate_common_differential_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                                                     nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                                                     nb::ndarray<Float, nb::c_contig> const&    occupancy,
+                                                     nb::ndarray<Float, nb::c_contig> const&    d_vertices,
+                                                     nb::ndarray<Float, nb::c_contig> const&    d_occupancy)
 {
     validate_common_voxelize_arguments(vertices, simplices, occupancy);
 
@@ -84,10 +85,10 @@ void validate_common_differential_voxelize_arguments(nb::ndarray<Float, nb::c_co
     }
 }
 
-template <typename Float>
-void voxelize_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
-                 nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                 nb::ndarray<Float, nb::c_contig> &occupancy,
+template<typename Float>
+void voxelize_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                 nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                 nb::ndarray<Float, nb::c_contig>&          occupancy,
                  uint32_t num_samples_per_voxel, Float filter_radius)
 {
     validate_common_voxelize_arguments(vertices, simplices, occupancy);
@@ -106,8 +107,8 @@ void voxelize_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
             if (filter.radius < voxel_spacing)
             {
                 nb::print(format_message("Warning: The filter radius (%f) is smaller than the space between voxels in dimension %d (%f).\n"
-                                        "This can result in voxels without valid samples. Consider increasing the sample count or the filter radius.",
-                                        filter.radius, i, voxel_spacing));
+                                         "This can result in voxels without valid samples. Consider increasing the sample count or the filter radius.",
+                                         filter.radius, i, voxel_spacing));
             }
         }
     }
@@ -120,13 +121,12 @@ void voxelize_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), num_samples_per_voxel, filter);
 }
 
-
-template <typename Float>
-void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
-                         nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                         nb::ndarray<Float, nb::c_contig> &occupancy /*unused*/,
-                         nb::ndarray<Float, nb::c_contig> const &d_vertices,
-                         nb::ndarray<Float, nb::c_contig> &d_occupancy,
+template<typename Float>
+void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                         nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                         nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
+                         nb::ndarray<Float, nb::c_contig> const&    d_vertices,
+                         nb::ndarray<Float, nb::c_contig>&          d_occupancy,
                          uint32_t num_samples_per_simplex, Float filter_radius)
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
@@ -139,7 +139,7 @@ void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const &vertices,
 
     if (dim == 2)
         dvx::voxelize_forward_mc_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1), 
+                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1),
                                            d_vertices.data(), d_occupancy.data(),
                                            num_samples_per_simplex, filter);
     if (dim == 3)
@@ -168,27 +168,31 @@ void voxelize_backward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
     throw std::invalid_argument("Not implemented.");
 }
 
-template <typename Float>
-void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const &vertices,
-                       nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                       nb::ndarray<Float, nb::c_contig> &occupancy)
+template<typename Float>
+void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                       nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                       nb::ndarray<Float, nb::c_contig>&          occupancy)
 {
     validate_common_voxelize_arguments(vertices, simplices, occupancy);
 
-    // TODO: Explicit integration
+    dvx::voxelize_explicit<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                  occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2));
 }
 
-template <typename Float>
-void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const &vertices,
-                               nb::ndarray<uint32_t, nb::c_contig> const &simplices,
-                               nb::ndarray<Float, nb::c_contig> &occupancy /*unused*/,
-                               nb::ndarray<Float, nb::c_contig> const &d_vertices,
-                               nb::ndarray<Float, nb::c_contig> &d_occupancy)
+template<typename Float>
+void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
+                               nb::ndarray<uint32_t, nb::c_contig> const& simplices,
+                               nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
+                               nb::ndarray<Float, nb::c_contig> const&    d_vertices,
+                               nb::ndarray<Float, nb::c_contig>&          d_occupancy)
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
-    // TODO: Explicit integration
+    dvx::voxelize_explicit_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                          occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                          d_vertices.data(), d_occupancy.data());
 }
+
 
 template<typename Float>
 void voxelize_backward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
@@ -210,9 +214,12 @@ NB_MODULE(dvx_ext, m)
     std::string build_type = "Debug";
 #endif
 
-    m.def("build_type", [=]() { return build_type; });
-    m.def("mute", [=]() { suppress_warnings = true; });
-    m.def("unmute", [=]() { suppress_warnings = false; });
+    m.def("build_type", [=]()
+          { return build_type; });
+    m.def("mute", [=]()
+          { suppress_warnings = true; });
+    m.def("unmute", [=]()
+          { suppress_warnings = false; });
 
 #define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                \
     m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                    \
