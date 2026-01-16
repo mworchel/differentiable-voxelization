@@ -98,4 +98,11 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
         backward_params['num_samples_per_simplex'] = kwargs.get('num_samples_per_simplex', 64)
         backward_params['filter_radius']           = filter_radius
 
-    return VoxelizeFunc.apply(grid_shape, vertices, indices, method, primal_params, backward_params)
+    occupancy = VoxelizeFunc.apply(grid_shape, vertices, indices, method, primal_params, backward_params)
+
+    # Convert from [depth,height,width] -> [width,height,depth]
+    # TODO: Use [depth,height,width] as canonical result
+    if method == 'mc' and dim == 3:
+        occupancy = occupancy.T 
+
+    return occupancy
