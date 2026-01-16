@@ -184,10 +184,10 @@ NB_MODULE(dvx_ext, m)
     m.def("unmute", [=]() { suppress_warnings = false; });
 
 #define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                   \
-    m.def("voxelize_mc"##tag, voxelize_mc<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                  \
-    m.def("voxelize_forward_mc"##tag, voxelize_forward_mc<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
-    m.def("voxelize_explicit"##tag, voxelize_explicit<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                              \
-    m.def("voxelize_forward_explicit"##tag, voxelize_forward_explicit<##type##>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
+    m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                  \
+    m.def("voxelize_forward_mc" tag, voxelize_forward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
+    m.def("voxelize_explicit" tag, voxelize_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                              \
+    m.def("voxelize_forward_explicit" tag, voxelize_forward_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
 
     BIND_FUNCTIONS(float, "_f32")
     // BIND_FUNCTIONS(double, "_f64")

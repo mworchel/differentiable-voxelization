@@ -29,9 +29,9 @@ Float kahan(Float a, Float b, Float c, Float d)
 
 #define DEFINE_BINARY_OPERATOR(type1, type2, rtype, op)                                                                                    \
     template<typename T, typename U, unsigned int N>                                                                                       \
-    rtype##<decltype(std::declval<T>() op std::declval<U>()), N> operator##op##(##type1##<T, N> const& v1, type2##<U, N> const& v2)        \
+    rtype<decltype(std::declval<T>() op std::declval<U>()), N> operator op (type1<T, N> const& v1, type2<U, N> const& v2)        \
     {                                                                                                                                      \
-        rtype##<decltype(std::declval<T>() op std::declval<U>()), N> out;                                                                  \
+        rtype<decltype(std::declval<T>() op std::declval<U>()), N> out;                                                                  \
         for (unsigned int i = 0; i < N; i++)                                                                                               \
         {                                                                                                                                  \
             out[i] = v1[i] op v2[i];                                                                                                       \
@@ -39,12 +39,12 @@ Float kahan(Float a, Float b, Float c, Float d)
         return out;                                                                                                                        \
     }                                                                                                                                      \
     template<typename T, typename U, unsigned int N,                                                                                       \
-             std::enable_if_t<std::is_same_v<##type1##<T, N>, ##rtype##<decltype(std::declval<T>() op std::declval<U>()), N>>>* = nullptr> \
-    type1##<T, N>& operator##op##=(type1##<T, N>& v1, ##type2##<U, N> const& v2)                                                           \
+             std::enable_if_t<std::is_same_v<type1<T, N>, rtype<decltype(std::declval<T>() op std::declval<U>()), N>>>* = nullptr> \
+    type1<T, N>& operator op##= (type1<T, N>& v1, type2<U, N> const& v2)                                                           \
     {                                                                                                                                      \
         for (unsigned int i = 0; i < N; i++)                                                                                               \
         {                                                                                                                                  \
-            v1[i] op## = v2[i];                                                                                                            \
+            v1[i] op##= v2[i];                                                                                                            \
         }                                                                                                                                  \
         return v1;                                                                                                                         \
     }
@@ -52,19 +52,19 @@ Float kahan(Float a, Float b, Float c, Float d)
 // Same as `DEFINE_BINARY_OPERATOR` but N is a parameter
 #define DEFINE_BINARY_OPERATOR_N(type1, type2, rtype, N, op)                                                                         \
     template<typename T, typename U>                                                                                                 \
-    rtype##<decltype(std::declval<T>() op std::declval<U>())> operator##op##(##type1##<T> const& v1, type2##<U> const& v2)           \
+    rtype<decltype(std::declval<T>() op std::declval<U>())> operator##op (type1<T> const& v1, type2<U> const& v2)           \
     {                                                                                                                                \
-        rtype##<decltype(std::declval<T>() op std::declval<U>())> out;                                                               \
+        rtype<decltype(std::declval<T>() op std::declval<U>())> out;                                                               \
         for (unsigned int i = 0; i < N; i++)                                                                                         \
         {                                                                                                                            \
             out[i] = v1[i] op v2[i];                                                                                                 \
         }                                                                                                                            \
         return out;                                                                                                                  \
     }                                                                                                                                \
-    template<typename T, typename U, std::enable_if_t<!std::is_same_v<##type1##<T>, ##type2##<U>>>* = nullptr>                       \
-    rtype##<decltype(std::declval<U>() op std::declval<T>())> operator##op##(##type2##<U> const& v2, type1##<T> const& v1)           \
+    template<typename T, typename U, std::enable_if_t<!std::is_same_v<type1<T>, type2<U>>>* = nullptr>                       \
+    rtype<decltype(std::declval<U>() op std::declval<T>())> operator##op (type2<U> const& v2, type1##<T> const& v1)           \
     {                                                                                                                                \
-        rtype##<decltype(std::declval<U>() op std::declval<T>())> out;                                                               \
+        rtype<decltype(std::declval<U>() op std::declval<T>())> out;                                                               \
         for (unsigned int i = 0; i < N; i++)                                                                                         \
         {                                                                                                                            \
             out[i] = v1[i] op v2[i];                                                                                                 \
@@ -72,12 +72,12 @@ Float kahan(Float a, Float b, Float c, Float d)
         return out;                                                                                                                  \
     }                                                                                                                                \
     template<typename T, typename U,                                                                                                 \
-             std::enable_if_t<std::is_same_v<##type1##<T>, ##rtype##<decltype(std::declval<T>() op std::declval<U>())>>>* = nullptr> \
-    type1##<T>& operator##op##=(type1##<T>& v1, ##type2##<U> const& v2)                                                              \
+             std::enable_if_t<std::is_same_v<type1<T>, rtype<decltype(std::declval<T>() op std::declval<U>())>>>* = nullptr> \
+    type1<T>& operator##op##=(type1<T>& v1, type2<U> const& v2)                                                              \
     {                                                                                                                                \
         for (unsigned int i = 0; i < N; i++)                                                                                         \
         {                                                                                                                            \
-            v1[i] op## = v2[i];                                                                                                      \
+            v1[i] op##= v2[i];                                                                                                      \
         }                                                                                                                            \
         return v1;                                                                                                                   \
     }
@@ -85,9 +85,9 @@ Float kahan(Float a, Float b, Float c, Float d)
 #define DEFINE_BINARY_OPERATOR_SCALAR(type, op)                                  \
     template<typename T, typename Scalar, unsigned int N,                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type##<T, N> operator##op##(##type##<T, N> const& v, Scalar scalar)          \
+    type<T, N> operator op (type<T, N> const& v, Scalar scalar)          \
     {                                                                            \
-        type##<T, N> result;                                                     \
+        type<T, N> result;                                                     \
         for (unsigned int i = 0; i < N; ++i)                                     \
         {                                                                        \
             result[i] = v[i] op scalar;                                          \
@@ -97,9 +97,9 @@ Float kahan(Float a, Float b, Float c, Float d)
                                                                                  \
     template<typename T, typename Scalar, unsigned int N,                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type##<T, N> operator##op##(Scalar scalar, ##type##<T, N> const& v)          \
+    type<T, N> operator op (Scalar scalar, type<T, N> const& v)          \
     {                                                                            \
-        type##<T, N> result;                                                     \
+        type<T, N> result;                                                     \
         for (unsigned int i = 0; i < N; ++i)                                     \
         {                                                                        \
             result[i] = scalar op v[i];                                          \
@@ -108,11 +108,11 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                            \
     template<typename T, typename Scalar, unsigned int N,                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type##<T, N>& operator##op##=(##type##<T, N> const& v, Scalar scalar)        \
+    type<T, N>& operator op##= (type<T, N> const& v, Scalar scalar)        \
     {                                                                            \
         for (unsigned int i = 0; i < N; i++)                                     \
         {                                                                        \
-            v[i] op## = scalar;                                                  \
+            v[i] op##= scalar;                                                  \
         }                                                                        \
         return v;                                                                \
     }
@@ -121,9 +121,9 @@ Float kahan(Float a, Float b, Float c, Float d)
 #define DEFINE_BINARY_OPERATOR_SCALAR_N(type, N, op)                             \
     template<typename T, typename Scalar,                                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type##<T> operator##op##(##type##<T> const& v, Scalar scalar)                \
+    type<T> operator op (type<T> const& v, Scalar scalar)                \
     {                                                                            \
-        type##<T> result;                                                        \
+        type<T> result;                                                        \
         for (unsigned int i = 0; i < N; ++i)                                     \
         {                                                                        \
             result[i] = v[i] op scalar;                                          \
@@ -133,9 +133,9 @@ Float kahan(Float a, Float b, Float c, Float d)
                                                                                  \
     template<typename T, typename Scalar,                                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type##<T> operator##op##(Scalar scalar, ##type##<T> const& v)                \
+    type<T> operator op (Scalar scalar, type<T> const& v)                \
     {                                                                            \
-        type##<T> result;                                                        \
+        type<T> result;                                                        \
         for (unsigned int i = 0; i < N; ++i)                                     \
         {                                                                        \
             result[i] = scalar op v[i];                                          \
@@ -144,20 +144,20 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                            \
     template<typename T, typename Scalar,                                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type##<T>& operator##op##=(##type##<T> const& v, Scalar scalar)              \
+    type<T>& operator op##= (type<T> const& v, Scalar scalar)              \
     {                                                                            \
         for (unsigned int i = 0; i < N; i++)                                     \
         {                                                                        \
-            v[i] op## = scalar;                                                  \
+            v[i] op##= scalar;                                                  \
         }                                                                        \
         return v;                                                                \
     }
 
 #define DEFINE_MASKING_AND_REDUCTION_FUNCTIONS_N(type, N)                                             \
     template<typename T, typename Predicate>                                                          \
-    type##<T> where(Predicate&& predicate, type##<T> const& true_value, type##<T> const& false_value) \
+    type<T> where(Predicate&& predicate, type<T> const& true_value, type<T> const& false_value) \
     {                                                                                                 \
-        type##<T> result;                                                                             \
+        type<T> result;                                                                             \
         for (unsigned int i = 0; i < N; ++i)                                                          \
             result[i] = predicate(i) ? true_value[i] : false_value[i];                                \
         return result;                                                                                \
@@ -213,19 +213,19 @@ struct PredicateAnd
         }                                                                                            \
                                                                                                      \
         template<typename Other>                                                                     \
-        PredicateAnd<Predicate##suffix##<Vector>, Other> operator&&(Other const& other) const        \
+        PredicateAnd<Predicate##suffix<Vector>, Other> operator&&(Other const& other) const        \
         {                                                                                            \
-            return PredicateAnd<Predicate##suffix##<Vector>, Other>{.pred1 = *this, .pred2 = other}; \
+            return PredicateAnd<Predicate##suffix<Vector>, Other>{.pred1 = *this, .pred2 = other}; \
         }                                                                                            \
     };                                                                                               \
     }                                                                                                \
                                                                                                      \
     template<typename Vector, typename Scalar,                                                       \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr>                     \
-    detail::Predicate##suffix##<Vector> name##(Vector const& vector, Scalar value)                   \
+    detail::Predicate##suffix<Vector> name (Vector const& vector, Scalar value)                   \
     {                                                                                                \
         using T = typename Vector::ValueType;                                                        \
-        return detail::Predicate##suffix##<Vector>{.value = T(value), .vector = vector};             \
+        return detail::Predicate##suffix<Vector>{.value = T(value), .vector = vector};             \
     }
 
 DEFINE_PREDICATE(is_not_equal, Neq, !=);
@@ -440,12 +440,12 @@ Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
 
 #define DECLARE_FLOAT_DEFINES(type, N)   \
     template<typename T>                 \
-    using type##N    = type##<T, N##U>;  \
-    using type##N##f = type##N##<float>; \
-    using type##N##d = type##N##<double>;
+    using type##N    = type<T, N>;  \
+    using type##N##f = type##N<float>; \
+    using type##N##d = type##N<double>;
 
 #define DECLARE_INTEGER_DEFINES(type, N) \
-    using type##N##u = type##N##<unsigned int>;
+    using type##N##u = type##N<unsigned int>;
 
 DECLARE_FLOAT_DEFINES(Vector, 2)
 DECLARE_FLOAT_DEFINES(Vector, 3)
