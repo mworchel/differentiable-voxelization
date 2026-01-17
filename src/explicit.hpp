@@ -364,9 +364,9 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
                             Float const differential_weight = d_occupancy[idx] / cell_volume;
                             for (int d = 0; d < 3; ++d)
                             {
-                                d_vertices[3 * i0 + d] += contrib[d] * dvn_vec[d] * differential_weight;
-                                d_vertices[3 * i1 + d] += contrib[d] * dvn_vec[d] * differential_weight;
-                                d_vertices[3 * i2 + d] += contrib[d] * dvn_vec[d] * differential_weight;
+                                d_vertices[3 * i0 + d] += contrib[0] * dvn_vec[d] * differential_weight;
+                                d_vertices[3 * i1 + d] += contrib[1] * dvn_vec[d] * differential_weight;
+                                d_vertices[3 * i2 + d] += contrib[2] * dvn_vec[d] * differential_weight;
                             }
                         }
                     }
