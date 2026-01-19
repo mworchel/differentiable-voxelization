@@ -5,3 +5,6 @@
 *.pyc
 *.env
 .venv
+
+.polyscope.ini
+imgui.ini
