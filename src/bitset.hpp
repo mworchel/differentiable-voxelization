@@ -14,6 +14,7 @@ public:
     {
         m_num_elements = (size + NumBitsPerElement - 1) / NumBitsPerElement;
         m_elements     = new Integer[m_num_elements];
+        MAYBE_STD(memset)(m_elements, 0, sizeof(Integer) * m_num_elements);
     }
 
     virtual ~Bitset()
