@@ -184,8 +184,14 @@ void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
 {
     validate_common_voxelize_arguments(vertices, simplices, occupancy);
 
-    dvx::voxelize_explicit<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                  occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2));
+    unsigned int dim = vertices.shape(1);
+
+    if (dim == 2)
+        dvx::voxelize_explicit_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                         occupancy.data(), occupancy.shape(0), occupancy.shape(1));
+    if (dim == 3)
+        dvx::voxelize_explicit<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                      occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2));
 }
 
 template<typename Float>
@@ -197,9 +203,16 @@ void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertic
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
-    dvx::voxelize_explicit_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                          occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
-                                          d_vertices.data(), d_occupancy.data());
+    unsigned int dim = vertices.shape(1);
+
+    if (dim == 2)
+        dvx::voxelize_explicit_2d_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                                  occupancy.data(), occupancy.shape(0), occupancy.shape(1),
+                                                  d_vertices.data(), d_occupancy.data());
+    if (dim == 3)
+        dvx::voxelize_explicit_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                              occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                              d_vertices.data(), d_occupancy.data());
 }
 
 
@@ -212,9 +225,16 @@ void voxelize_backward_explicit(nb::ndarray<Float, nb::c_contig> const&    verti
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
-    dvx::voxelize_explicit_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                           occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
-                                           d_vertices.data(), d_occupancy.data());
+    unsigned int dim = vertices.shape(1);
+
+    if (dim == 2)
+        dvx::voxelize_explicit_2d_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                                   occupancy.data(), occupancy.shape(0), occupancy.shape(1),
+                                                   d_vertices.data(), d_occupancy.data());
+    if (dim == 3)
+        dvx::voxelize_explicit_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+                                               occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
+                                               d_vertices.data(), d_occupancy.data());
 }
 
 NB_MODULE(dvx_ext, m)

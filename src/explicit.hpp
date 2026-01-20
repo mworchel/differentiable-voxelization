@@ -17,6 +17,310 @@ namespace nb = nanobind;
 namespace dvx
 {
 
+///////////////////////////////////////////////////////////////////////////////
+// 2d Case
+///////////////////////////////////////////////////////////////////////////////
+
+// Split a segment (in barycentric coords) by a Cartesian line
+// Barycentric coords for segment: b = (b0, b1) where point = b0*v0 + b1*v1, b0+b1=1
+// Returns (below_or_equal, above) segments as (t_lo, t_hi) ranges where t = b1
+template<typename Float>
+void split_segment_bary(Float t_lo, Float t_hi,
+                        Vector<Float, 2> const& edge_coords,
+                        Float                   value,
+                        Float&                  below_lo, Float& below_hi,
+                        Float&                  above_lo, Float& above_hi,
+                        bool&                   has_below, bool& has_above)
+{
+    has_below = has_above = false;
+    if (t_lo >= t_hi)
+        return;
+
+    // Cartesian coord at t: (1-t)*edge_coords[0] + t*edge_coords[1]
+    Float v_lo = (Float(1) - t_lo) * edge_coords[0] + t_lo * edge_coords[1];
+    Float v_hi = (Float(1) - t_hi) * edge_coords[0] + t_hi * edge_coords[1];
+    bool  b_lo = v_lo <= value;
+    bool  b_hi = v_hi <= value;
+
+    if (b_lo && b_hi)
+    {
+        has_below = true;
+        below_lo  = t_lo;
+        below_hi  = t_hi;
+    }
+    else if (!b_lo && !b_hi)
+    {
+        has_above = true;
+        above_lo  = t_lo;
+        above_hi  = t_hi;
+    }
+    else
+    {
+        Float d = v_hi - v_lo;
+        if (std::abs(d) > Float(1e-12))
+        {
+            Float t_mid = t_lo + (value - v_lo) / d * (t_hi - t_lo);
+            if (b_lo)
+            {
+                has_below = true;
+                below_lo  = t_lo;
+                below_hi  = t_mid;
+                has_above = true;
+                above_lo  = t_mid;
+                above_hi  = t_hi;
+            }
+            else
+            {
+                has_above = true;
+                above_lo  = t_lo;
+                above_hi  = t_mid;
+                has_below = true;
+                below_lo  = t_mid;
+                below_hi  = t_hi;
+            }
+        }
+    }
+}
+
+// 2D Explicit Voxelization (edges/segments)
+template<typename Float, bool primal, DifferentiationMode Mode>
+void voxelize_explicit_2d_generalized(Float const* vertices, uint32_t const num_vertices,
+                                      uint32_t const* edges, uint32_t const num_edges,
+                                      Float* occupancy, uint32_t const height, uint32_t const width,
+                                      dIn<Float, Mode>*  d_vertices,
+                                      dOut<Float, Mode>* d_occupancy)
+{
+    const Float step_x    = Float(2) / height;
+    const Float step_y    = Float(2) / width;
+    const Float cell_area = step_x * step_y;
+
+    // Center of the grid in y (for center-based optimization)
+    const int center_j = static_cast<int>(width) / 2;
+
+    for (uint32_t edge_idx = 0; edge_idx < num_edges; ++edge_idx)
+    {
+        const uint32_t i0 = edges[edge_idx * 2 + 0];
+        const uint32_t i1 = edges[edge_idx * 2 + 1];
+
+        const Vector<Float, 2> v0(&vertices[i0 * 2]);
+        const Vector<Float, 2> v1(&vertices[i1 * 2]);
+
+        const Vector<Float, 2> edge_vec = v1 - v0;
+        const Float            edge_len = norm(edge_vec);
+
+        if (edge_len < Float(1e-12))
+            continue;
+
+        // Normal perpendicular to edge: (dy, -dx)
+        const Vector<Float, 2> normal(edge_vec.y(), -edge_vec.x());
+
+        // for primal only
+        Float sign_ny;
+        // for differential only
+        Vector<Float, 2> dvn_vec;
+        Vector<Float, 2> unit_normal;
+
+        if constexpr (primal)
+        {
+            // Only care about y-component of normal for primal
+            if (std::abs(normal.y()) < Float(1e-12))
+                continue;
+
+            sign_ny = (normal.y() > 0) ? Float(1) : Float(-1);
+        }
+        else
+        {
+            unit_normal = normal / edge_len;
+
+            if constexpr (Mode == DifferentiationMode::Backward)
+            {
+                dvn_vec[0] = unit_normal[0];
+                dvn_vec[1] = unit_normal[1];
+            }
+            else
+            {
+                const Vector<Float, 2> dv0(&d_vertices[i0 * 2]);
+                const Vector<Float, 2> dv1(&d_vertices[i1 * 2]);
+                dvn_vec[0] = dot(dv0, unit_normal);
+                dvn_vec[1] = dot(dv1, unit_normal);
+            }
+        }
+
+        // Bounding box in grid coordinates
+        const Float min_x = std::min(v0.x(), v1.x());
+        const Float min_y = std::min(v0.y(), v1.y());
+        const Float max_x = std::max(v0.x(), v1.x());
+        const Float max_y = std::max(v0.y(), v1.y());
+
+        const int bbox_min_i = std::max(0, static_cast<int>((min_x + 1) / step_x));
+        const int bbox_min_j = std::max(0, static_cast<int>((min_y + 1) / step_y));
+        const int bbox_max_i = std::min(static_cast<int>(height) - 1, static_cast<int>((max_x + 1) / step_x));
+        const int bbox_max_j = std::min(static_cast<int>(width) - 1, static_cast<int>((max_y + 1) / step_y));
+
+        // Edge coordinates per axis
+        const Vector<Float, 2> edge_x(v0.x(), v1.x());
+        const Vector<Float, 2> edge_y(v0.y(), v1.y());
+
+        // Start with full segment: t in [0, 1]
+        Float remaining_lo = Float(0), remaining_hi = Float(1);
+
+        for (int i = bbox_min_i; i <= bbox_max_i; ++i)
+        {
+            if (remaining_lo >= remaining_hi)
+                break;
+
+            const Float x_hi = Float(-1) + (i + 1) * step_x;
+
+            Float seg_lo, seg_hi, above_lo, above_hi;
+            bool  has_seg, has_above;
+            split_segment_bary(remaining_lo, remaining_hi, edge_x, x_hi,
+                               seg_lo, seg_hi, above_lo, above_hi, has_seg, has_above);
+
+            if (has_above)
+            {
+                remaining_lo = above_lo;
+                remaining_hi = above_hi;
+            }
+            else
+            {
+                remaining_lo = remaining_hi;
+            }
+
+            if (!has_seg)
+                continue;
+
+            // Get y bounds for this x-slice
+            Float y_lo_slice = (Float(1) - seg_lo) * v0.y() + seg_lo * v1.y();
+            Float y_hi_slice = (Float(1) - seg_hi) * v0.y() + seg_hi * v1.y();
+            if (y_lo_slice > y_hi_slice)
+                std::swap(y_lo_slice, y_hi_slice);
+
+            const int j_min = std::max(bbox_min_j, static_cast<int>((y_lo_slice + 1) / step_y));
+            const int j_max = std::min(bbox_max_j, static_cast<int>((y_hi_slice + 1) / step_y));
+
+            Float remaining_y_lo = seg_lo, remaining_y_hi = seg_hi;
+
+            for (int j = j_min; j <= j_max; ++j)
+            {
+                if (remaining_y_lo >= remaining_y_hi)
+                    break;
+
+                const Float y_hi = Float(-1) + (j + 1) * step_y;
+
+                Float cell_lo, cell_hi, ay_lo, ay_hi;
+                bool  has_cell, has_ay;
+                split_segment_bary(remaining_y_lo, remaining_y_hi, edge_y, y_hi,
+                                   cell_lo, cell_hi, ay_lo, ay_hi, has_cell, has_ay);
+
+                if (has_ay)
+                {
+                    remaining_y_lo = ay_lo;
+                    remaining_y_hi = ay_hi;
+                }
+                else
+                {
+                    remaining_y_lo = remaining_y_hi;
+                }
+
+                if (!has_cell)
+                    continue;
+
+                // Compute clipped segment endpoints
+                const Vector<Float, 2> p0 = v0 * (Float(1) - cell_lo) + v1 * cell_lo;
+                const Vector<Float, 2> p1 = v0 * (Float(1) - cell_hi) + v1 * cell_hi;
+                const Float            seg_len = norm(p1 - p0);
+
+                if (seg_len < Float(1e-12))
+                    continue;
+
+                const size_t idx = static_cast<size_t>(i * width + j);
+
+                if constexpr (primal)
+                {
+                    // Projected length in x direction
+                    const Float len_x = std::abs(p1.x() - p0.x());
+                    if (len_x < Float(1e-12))
+                        continue;
+
+                    const bool  below_center = y_hi <= step_y / 2;
+                    const Float sign         = below_center ? -sign_ny : sign_ny;
+                    const int   start        = below_center ? j + 1 : center_j;
+                    const int   end          = below_center ? center_j : j;
+                    const Float y_ref        = below_center ? y_hi : y_hi - step_y;
+
+                    // Full contribution to cells toward center
+                    const Float contribution = sign * len_x / step_x;
+                    for (int jj = start; jj < end; ++jj)
+                    {
+                        const size_t full_idx = static_cast<size_t>(i * width + jj);
+                        occupancy[full_idx] += contribution;
+                    }
+
+                    // Partial contribution for this cell
+                    const Float avg_y   = (p0.y() + p1.y()) / Float(2);
+                    const Float contrib = len_x * (avg_y - y_ref);
+                    occupancy[idx] += sign_ny * contrib / cell_area;
+                }
+                else
+                {
+                    // Average barycentric coord (midpoint of segment)
+                    const Float b0 = Float(1) - (cell_lo + cell_hi) / Float(2);
+                    const Float b1 = (cell_lo + cell_hi) / Float(2);
+
+                    if constexpr (Mode == DifferentiationMode::Forward)
+                    {
+                        const Float avg_dvn = b0 * dvn_vec[0] + b1 * dvn_vec[1];
+                        d_occupancy[idx] += avg_dvn * seg_len / cell_area;
+                    }
+                    else
+                    {
+                        const Float w = d_occupancy[idx] * seg_len / cell_area;
+                        d_vertices[i0 * 2 + 0] += b0 * dvn_vec[0] * w;
+                        d_vertices[i0 * 2 + 1] += b0 * dvn_vec[1] * w;
+                        d_vertices[i1 * 2 + 0] += b1 * dvn_vec[0] * w;
+                        d_vertices[i1 * 2 + 1] += b1 * dvn_vec[1] * w;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 2D wrappers
+template<typename Float>
+void voxelize_explicit_2d(Float const* vertices, uint32_t const num_vertices,
+                          uint32_t const* edges, uint32_t const num_edges,
+                          Float* occupancy, uint32_t const height, uint32_t const width)
+{
+    return voxelize_explicit_2d_generalized<Float, true, DifferentiationMode::Forward>(
+        vertices, num_vertices, edges, num_edges, occupancy, height, width, nullptr, nullptr);
+}
+
+template<typename Float>
+void voxelize_explicit_2d_forward(Float const* vertices, uint32_t const num_vertices,
+                                  uint32_t const* edges, uint32_t const num_edges,
+                                  Float* occupancy, uint32_t const height, uint32_t const width,
+                                  Float const* d_vertices, Float* d_occupancy)
+{
+    return voxelize_explicit_2d_generalized<Float, false, DifferentiationMode::Forward>(
+        vertices, num_vertices, edges, num_edges, occupancy, height, width, d_vertices, d_occupancy);
+}
+
+template<typename Float>
+void voxelize_explicit_2d_backward(Float const* vertices, uint32_t const num_vertices,
+                                   uint32_t const* edges, uint32_t const num_edges,
+                                   Float* occupancy, uint32_t const height, uint32_t const width,
+                                   Float* d_vertices, Float const* d_occupancy)
+{
+    return voxelize_explicit_2d_generalized<Float, false, DifferentiationMode::Backward>(
+        vertices, num_vertices, edges, num_edges, occupancy, height, width, d_vertices, d_occupancy);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// 3d Case
+///////////////////////////////////////////////////////////////////////////////
+
 // Compute area of a polygon using shoelace formula
 template<typename Float>
 Float polygon_area_2d(std::vector<Vector<Float, 3>> const& vertices)
@@ -375,6 +679,9 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
         }
     }
 }
+
+
+// 3d Wrappers
 template<typename Float>
 void voxelize_explicit(Float const* vertices, uint32_t const num_vertices,
                        uint32_t const* faces, uint32_t const num_faces,
