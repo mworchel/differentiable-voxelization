@@ -84,7 +84,7 @@ void split_segment_bary(Float t_lo, Float t_hi,
 
 // 2D Explicit Voxelization (edges/segments)
 template<typename Float, bool primal, DifferentiationMode Mode>
-void voxelize_explicit_2d_generalized(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_2d_generalized(Float const* vertices, uint32_t const num_vertices,
                                       uint32_t const* edges, uint32_t const num_edges,
                                       Float* occupancy, uint32_t const height, uint32_t const width,
                                       dIn<Float, Mode>*  d_vertices,
@@ -288,31 +288,31 @@ void voxelize_explicit_2d_generalized(Float const* vertices, uint32_t const num_
 
 // 2D wrappers
 template<typename Float>
-void voxelize_explicit_2d(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_2d(Float const* vertices, uint32_t const num_vertices,
                           uint32_t const* edges, uint32_t const num_edges,
                           Float* occupancy, uint32_t const height, uint32_t const width)
 {
-    return voxelize_explicit_2d_generalized<Float, true, DifferentiationMode::Forward>(
+    return voxelize_cf_2d_generalized<Float, true, DifferentiationMode::Forward>(
         vertices, num_vertices, edges, num_edges, occupancy, height, width, nullptr, nullptr);
 }
 
 template<typename Float>
-void voxelize_explicit_2d_forward(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_2d_forward(Float const* vertices, uint32_t const num_vertices,
                                   uint32_t const* edges, uint32_t const num_edges,
                                   Float* occupancy, uint32_t const height, uint32_t const width,
                                   Float const* d_vertices, Float* d_occupancy)
 {
-    return voxelize_explicit_2d_generalized<Float, false, DifferentiationMode::Forward>(
+    return voxelize_cf_2d_generalized<Float, false, DifferentiationMode::Forward>(
         vertices, num_vertices, edges, num_edges, occupancy, height, width, d_vertices, d_occupancy);
 }
 
 template<typename Float>
-void voxelize_explicit_2d_backward(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_2d_backward(Float const* vertices, uint32_t const num_vertices,
                                    uint32_t const* edges, uint32_t const num_edges,
                                    Float* occupancy, uint32_t const height, uint32_t const width,
                                    Float* d_vertices, Float const* d_occupancy)
 {
-    return voxelize_explicit_2d_generalized<Float, false, DifferentiationMode::Backward>(
+    return voxelize_cf_2d_generalized<Float, false, DifferentiationMode::Backward>(
         vertices, num_vertices, edges, num_edges, occupancy, height, width, d_vertices, d_occupancy);
 }
 
@@ -389,7 +389,7 @@ void split_polygon_bary(std::vector<Vector<Float, 3>> const& polygon_bary,
 }
 
 template<typename Float, bool primal, DifferentiationMode Mode>
-void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_generalized(Float const* vertices, uint32_t const num_vertices,
                                    uint32_t const* faces, uint32_t const num_faces,
                                    Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
                                    dIn<Float, Mode>*   d_vertices,
@@ -683,11 +683,11 @@ void voxelize_explicit_generalized(Float const* vertices, uint32_t const num_ver
 
 // 3d Wrappers
 template<typename Float>
-void voxelize_explicit(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf(Float const* vertices, uint32_t const num_vertices,
                        uint32_t const* faces, uint32_t const num_faces,
                        Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width)
 {
-    return voxelize_explicit_generalized<Float, true, DifferentiationMode::Forward>(vertices, num_vertices,
+    return voxelize_cf_generalized<Float, true, DifferentiationMode::Forward>(vertices, num_vertices,
                                                              faces, num_faces,
                                                              occupancy, depth, height, width,
                                                              NULL,
@@ -695,13 +695,13 @@ void voxelize_explicit(Float const* vertices, uint32_t const num_vertices,
 }
 
 template<typename Float>
-void voxelize_explicit_forward(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_forward(Float const* vertices, uint32_t const num_vertices,
                                uint32_t const* faces, uint32_t const num_faces,
                                Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
                                Float const* d_vertices,
                                Float*       d_occupancy)
 {
-    return voxelize_explicit_generalized<Float, false, DifferentiationMode::Forward>(vertices, num_vertices,
+    return voxelize_cf_generalized<Float, false, DifferentiationMode::Forward>(vertices, num_vertices,
                                                              faces, num_faces,
                                                              occupancy, depth, height, width,
                                                              d_vertices,
@@ -709,13 +709,13 @@ void voxelize_explicit_forward(Float const* vertices, uint32_t const num_vertice
 }
 
 template<typename Float>
-void voxelize_explicit_backward(Float const* vertices, uint32_t const num_vertices,
+void voxelize_cf_backward(Float const* vertices, uint32_t const num_vertices,
                                uint32_t const* faces, uint32_t const num_faces,
                                Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
                                Float* d_vertices,
                                Float const*       d_occupancy)
 {
-    return voxelize_explicit_generalized<Float, false, DifferentiationMode::Backward>(vertices, num_vertices,
+    return voxelize_cf_generalized<Float, false, DifferentiationMode::Backward>(vertices, num_vertices,
                                                              faces, num_faces,
                                                              occupancy, depth, height, width,
                                                              d_vertices,

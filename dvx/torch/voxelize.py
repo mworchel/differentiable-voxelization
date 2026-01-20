@@ -14,8 +14,8 @@ class VoxelizeFunc(torch.autograd.Function):
         primal_func = None
         if method == 'mc':            
             primal_func = dvx_ext.voxelize_mc_f32 if dtype == torch.float32 else dvx_ext.voxelize_mc_f64
-        elif method == 'explicit':
-            primal_func = dvx_ext.voxelize_explicit_f32 if dtype == torch.float32 else dvx_ext.voxelize_explicit_f64
+        elif method == 'cf':
+            primal_func = dvx_ext.voxelize_cf_f32 if dtype == torch.float32 else dvx_ext.voxelize_cf_f64
         else:
             raise RuntimeError(f"Invalid method '{method}'.")
 
@@ -43,8 +43,8 @@ class VoxelizeFunc(torch.autograd.Function):
         backward_func = None
         if method == 'mc':            
             backward_func = dvx_ext.voxelize_backward_mc_f32 if dtype == torch.float32 else dvx_ext.voxelize_backward_mc_f64
-        elif method == 'explicit':
-            backward_func = dvx_ext.voxelize_backward_explicit_f32 if dtype == torch.float32 else dvx_ext.voxelize_backward_explicit_f64
+        elif method == 'cf':
+            backward_func = dvx_ext.voxelize_backward_cf_f32 if dtype == torch.float32 else dvx_ext.voxelize_backward_cf_f64
         else:
             raise RuntimeError(f"Invalid method '{method}'.")
 
@@ -68,7 +68,7 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
     indices : torch.Tensor
         Index array, in 2D with shape (F,2) and in 3D with shape (F,3)
     method : str
-        The integration method, one of ['mc', 'explicit', 'auto']. Default: 'auto'.
+        The integration method, one of ['mc', 'cf', 'auto']. Default: 'auto'.
     filter_radius : Optional[float]
         Radius of the filter, by default the size of half a voxel.
 
@@ -84,11 +84,11 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
     half_voxel_size = 0.5 * (2 / n)
     if filter_radius is None:
         filter_radius = half_voxel_size
-    elif method == 'explicit' and not math.isclose(half_voxel_size, filter_radius):
-        print(f"Warning: Integration mode 'explicit' implicitly assumes a box filter the size of a voxel (={half_voxel_size}). The given filter radius (={filter_radius}) has no effect.")
+    elif method == 'cf' and not math.isclose(half_voxel_size, filter_radius):
+        print(f"Warning: Integration mode 'cf' implicitly assumes a box filter the size of a voxel (={half_voxel_size}). The given filter radius (={filter_radius}) has no effect.")
 
     if method == 'auto':
-        method = 'explicit' if math.isclose(half_voxel_size, filter_radius) else 'mc'    
+        method = 'cf' if math.isclose(half_voxel_size, filter_radius) else 'mc'    
 
     primal_params = {}
     backward_params = {}

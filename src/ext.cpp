@@ -14,7 +14,7 @@
 #include <nanobind/stl/vector.h>
 
 #include "common.hpp"
-#include "explicit.hpp"
+#include "closed_form.hpp"
 #include "filter.hpp"
 #include "log.hpp"
 #include "math.hpp"
@@ -178,7 +178,7 @@ void voxelize_backward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
 }
 
 template<typename Float>
-void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
+void voxelize_cf(nb::ndarray<Float, nb::c_contig> const&    vertices,
                        nb::ndarray<uint32_t, nb::c_contig> const& simplices,
                        nb::ndarray<Float, nb::c_contig>&          occupancy)
 {
@@ -187,15 +187,15 @@ void voxelize_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
     unsigned int dim = vertices.shape(1);
 
     if (dim == 2)
-        dvx::voxelize_explicit_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+        dvx::voxelize_cf_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                          occupancy.data(), occupancy.shape(0), occupancy.shape(1));
     if (dim == 3)
-        dvx::voxelize_explicit<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+        dvx::voxelize_cf<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                       occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2));
 }
 
 template<typename Float>
-void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
+void voxelize_forward_cf(nb::ndarray<Float, nb::c_contig> const&    vertices,
                                nb::ndarray<uint32_t, nb::c_contig> const& simplices,
                                nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
                                nb::ndarray<Float, nb::c_contig> const&    d_vertices,
@@ -206,18 +206,18 @@ void voxelize_forward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertic
     unsigned int dim = vertices.shape(1);
 
     if (dim == 2)
-        dvx::voxelize_explicit_2d_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+        dvx::voxelize_cf_2d_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                   occupancy.data(), occupancy.shape(0), occupancy.shape(1),
                                                   d_vertices.data(), d_occupancy.data());
     if (dim == 3)
-        dvx::voxelize_explicit_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+        dvx::voxelize_cf_forward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                               occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
                                               d_vertices.data(), d_occupancy.data());
 }
 
 
 template<typename Float>
-void voxelize_backward_explicit(nb::ndarray<Float, nb::c_contig> const&    vertices,
+void voxelize_backward_cf(nb::ndarray<Float, nb::c_contig> const&    vertices,
                                 nb::ndarray<uint32_t, nb::c_contig> const& simplices,
                                 nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
                                 nb::ndarray<Float, nb::c_contig>&          d_vertices,
@@ -228,11 +228,11 @@ void voxelize_backward_explicit(nb::ndarray<Float, nb::c_contig> const&    verti
     unsigned int dim = vertices.shape(1);
 
     if (dim == 2)
-        dvx::voxelize_explicit_2d_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+        dvx::voxelize_cf_2d_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                    occupancy.data(), occupancy.shape(0), occupancy.shape(1),
                                                    d_vertices.data(), d_occupancy.data());
     if (dim == 3)
-        dvx::voxelize_explicit_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
+        dvx::voxelize_cf_backward<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
                                                d_vertices.data(), d_occupancy.data());
 }
@@ -256,9 +256,9 @@ NB_MODULE(dvx_ext, m)
     m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("filter_radius"));                                                                    \
     m.def("voxelize_forward_mc" tag, voxelize_forward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius"));   \
     m.def("voxelize_backward_mc" tag, voxelize_backward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
-    m.def("voxelize_explicit" tag, voxelize_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                    \
-    m.def("voxelize_forward_explicit" tag, voxelize_forward_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));                                                     \
-    m.def("voxelize_backward_explicit" tag, voxelize_backward_explicit<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
+    m.def("voxelize_cf" tag, voxelize_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                    \
+    m.def("voxelize_forward_cf" tag, voxelize_forward_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));                                                     \
+    m.def("voxelize_backward_cf" tag, voxelize_backward_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
 
     BIND_FUNCTIONS(float, "_f32")
     BIND_FUNCTIONS(double, "_f64")
