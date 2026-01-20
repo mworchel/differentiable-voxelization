@@ -15,11 +15,14 @@
 namespace dvx
 {
 
+#define DVX_MC_PRIMAL_STRATIFIED_SAMPLING 1
+#define DVX_MC_PRIMAL_ADAPTIVE_SAMPLING 1
+
 template<typename Float>
 void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     uint32_t const* edges, uint32_t const num_edges,
                     Float* occupancy, uint32_t const height, uint32_t const width,
-                    uint32_t const      num_samples_per_voxel,
+                    uint32_t num_samples_per_voxel,
                     Filter<Float> const filter)
 {
     std::default_random_engine            engine(std::random_device{}());
@@ -31,6 +34,13 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         Float(2) / height};
 
     Float const voxel_volume = voxel_size[0] * voxel_size[1];
+
+#if DVX_MC_PRIMAL_STRATIFIED_SAMPLING
+    // Round to next square root (TODO: do somewhere else?)
+    uint32_t const num_samples_sqrt = MAYBE_STD(ceil)(MAYBE_STD(sqrt)(num_samples_per_voxel));
+    num_samples_per_voxel = num_samples_sqrt * num_samples_sqrt;
+    Vector2<Float> const stratum_size = voxel_size / num_samples_sqrt;
+#endif
 
     uint64_t num_samples = num_samples_per_voxel * height * width;
     for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
@@ -52,7 +62,19 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
             x * voxel_size[0] - Float(1),
             y * voxel_size[1] - Float(1)};
 
+#if DVX_MC_PRIMAL_STRATIFIED_SAMPLING
+        // Compute the stratum
+        uint64_t const sample_lane = sample_index % num_samples_per_voxel;
+        uint32_t const stratum_x = sample_lane % num_samples_sqrt;
+        uint32_t const stratum_y = sample_lane / num_samples_sqrt;
+        
+        Point2<Float> const sample{
+            voxel_origin[0] + (stratum_x + sample_local[0]) * stratum_size[0],
+            voxel_origin[1] + (stratum_y + sample_local[1]) * stratum_size[1],
+        };
+#else
         Point2<Float> const sample = voxel_origin + voxel_size * sample_local;
+#endif
 
         Float sample_occupancy = generalized_winding_number<Float, 2>(vertices, num_vertices,
                                                                       edges, num_edges,
@@ -177,7 +199,6 @@ void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
     }
 }
 
-#define DVX_MC_PRIMAL_ADAPTIVE_SAMPLING 1
 
 template<typename Float>
 void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
