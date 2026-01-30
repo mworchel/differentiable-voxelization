@@ -207,6 +207,9 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     uint32_t const      num_samples_per_voxel,
                     Filter<Float> const filter)
 {
+    // TODO: Inject into this function
+    Allocator& allocator = DefaultAllocator::instance();
+
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector3<Float> const voxel_size{
         Float(2) / width,
@@ -215,7 +218,8 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
 
 #if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
     // Tag near-surface voxels using the axis-aligned bounding box
-    Bitset mask(depth * height * width);
+    Bitset mask;
+    create_bitset(&mask, depth * height * width, allocator);
     for (uint32_t face_index = 0; face_index < num_faces; ++face_index)
     {
         Point3<uint32_t> const face(&faces[3 * face_index]);
@@ -251,7 +255,6 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                 {
                     uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
                     mask.set(n_voxel_index);
-                    // occupancy[n_voxel_index] = Float(1);
                 }
             }
         }
@@ -328,6 +331,8 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
             }
         }
     }
+
+    free_bitset(mask, allocator);
 }
 
 // Forward-mode derivatives of the smooth indicator function

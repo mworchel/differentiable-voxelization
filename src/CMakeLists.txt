@@ -1,12 +1,14 @@
 # Add the core library containing the algorithms
-add_library(dvx INTERFACE common.hpp 
-                          differentiation.hpp
-                          filter.hpp 
-                          grid.hpp
-                          math.hpp
-                          monte_carlo.hpp
-                          winding_number.hpp)
-target_include_directories(dvx INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(dvx allocator.hpp allocator.cpp
+                bitset.hpp bitset.cpp
+                common.hpp 
+                differentiation.hpp
+                filter.hpp 
+                grid.hpp
+                math.hpp
+                monte_carlo.hpp
+                winding_number.hpp)
+target_include_directories(dvx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add the Python extension
 nanobind_add_module(
