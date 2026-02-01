@@ -332,7 +332,9 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         }
     }
 
-    free_bitset(mask, allocator);
+#if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
+    free_bitset(&mask, allocator);
+#endif
 }
 
 // Forward-mode derivatives of the smooth indicator function
