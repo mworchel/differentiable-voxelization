@@ -49,7 +49,9 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
     Allocator& allocator = DefaultAllocator::instance();
 
     // TODO: Lift assumption of grid being in [-1,1]^3
-    Vector2<Float> const voxel_size = get_voxel_size<Float>(grid);
+    Vector2<Float> const voxel_size                = get_voxel_size<Float>(grid);
+    Vector2<Float> const half_voxel_size           = Float(0.5) * voxel_size;
+    Vector2<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);
 
     // Tag near-surface voxels
     Bitset mask;
@@ -151,11 +153,11 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                 // Compute the weight using the distance from the sample to the voxel center
                 Point2<int32_t> n_voxel(nx, ny);
 
-                // TODO: Optimize such expression:
+                // TODO: Optimize these expressions:
                 // Point2<Float> const n_center = (Point2<Float>(n_voxel) + Float(0.5)) * voxel_size - Float(1);
                 Point2<Float> const n_center{
-                        (nx + Float(0.5)) * voxel_size[0] - Float(1),
-                        (ny + Float(0.5)) * voxel_size[1] - Float(1)};
+                        nx * voxel_size[0] + half_voxel_size_minus_one[0],
+                        ny * voxel_size[1] + half_voxel_size_minus_one[1]};
 
                 Float const    filter_weight = filter.eval(n_center - sample);
                 uint64_t const n_voxel_index = coords_to_linear_index(n_voxel, grid);
@@ -275,7 +277,9 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
     Allocator& allocator = DefaultAllocator::instance();
 
     // TODO: Lift assumption of grid being in [-1,1]^3
-    Vector3<Float> const voxel_size = get_voxel_size<Float>(grid);
+    Vector3<Float> const voxel_size                = get_voxel_size<Float>(grid);
+    Vector3<Float> const half_voxel_size           = Float(0.5) * voxel_size;
+    Vector3<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);
 
     // Tag near-surface voxels
     Bitset mask;
@@ -357,9 +361,9 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     // TODO: Optimize these expressions:
                     // Point3<Float> const n_center = (Point3<Float>(n_voxel) + Float(0.5)) * voxel_size - Float(1);
                     Point3<Float> const n_center{
-                        (nx + Float(0.5)) * voxel_size[0] - Float(1),
-                        (ny + Float(0.5)) * voxel_size[1] - Float(1),
-                        (nz + Float(0.5)) * voxel_size[2] - Float(1)};
+                        nx * voxel_size[0] + half_voxel_size_minus_one[0],
+                        ny * voxel_size[1] + half_voxel_size_minus_one[1],
+                        nz * voxel_size[2] + half_voxel_size_minus_one[2]};
 
                     Float const    filter_weight = filter.eval(n_center - sample);
                     uint64_t const n_voxel_index = coords_to_linear_index(n_voxel, grid);
