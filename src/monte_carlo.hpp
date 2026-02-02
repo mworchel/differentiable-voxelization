@@ -8,6 +8,7 @@
 #include "aabb.hpp"
 #include "bitset.hpp"
 #include "common.hpp"
+#include "coverage.hpp"
 #include "differentiation.hpp"
 #include "flags.hpp"
 #include "filter.hpp"
@@ -44,13 +45,26 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     MonteCarloParameters const& mc_params,
                     Filter<Float> const& filter)
 {
-    std::default_random_engine            engine(std::random_device{}());
-    std::uniform_real_distribution<Float> distribution;
+    // TODO: Inject into this function
+    Allocator& allocator = DefaultAllocator::instance();
 
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector2<Float> const voxel_size{
         Float(2) / width,
         Float(2) / height};
+
+    // Tag near-surface voxels
+    Bitset mask;
+    if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
+    {
+        Extent<2> grid{width, height};
+        create_bitset(&mask, grid.num_elements(), allocator);
+        mark_boundary_voxels<Float, 2>(vertices, edges, num_edges,
+                                       grid, filter.radius, &mask);
+    }
+
+    std::default_random_engine            engine(std::random_device{}());
+    std::uniform_real_distribution<Float> distribution;
 
     Float const voxel_volume = voxel_size[0] * voxel_size[1];
 
@@ -66,11 +80,26 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         stratum_size          = voxel_size / num_samples_sqrt;
     }
 
-    uint64_t num_samples = num_samples_per_voxel * height * width;
-    for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
+    uint64_t num_samples_total = num_samples_per_voxel * height * width;
+    for (uint64_t sample_index = 0; sample_index < num_samples_total; ++sample_index)
     {
-        // Transform sample to global space
         uint64_t const voxel_index = sample_index / num_samples_per_voxel;
+
+        // Override the number of samples for this voxel to 1, if it is constant (not near the surface)
+        uint32_t num_samples_this_voxel = num_samples_per_voxel;
+        if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
+        {
+            bool const is_constant_voxel = !mask.is_set(voxel_index);
+            if (is_constant_voxel)
+            {
+                num_samples_this_voxel = 1u;
+
+                // Skip all but sample 0 for this voxel
+                uint64_t const sample_lane = sample_index % num_samples_per_voxel;
+                if (sample_lane > 0)
+                    continue;
+            }
+        }
 
         // Generate sample position in voxel-local space
         Point2<Float> const sample_local{
@@ -82,13 +111,14 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         uint32_t const y = voxel_index / width;
         uint32_t const x = voxel_index % width;
 
+        // Transform sample to global space
         Point2<Float> const voxel_origin{
             x * voxel_size[0] - Float(1),
             y * voxel_size[1] - Float(1)};
 
-        // Compute the sample position in world space
         Point2<Float> sample;
-        if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified))
+        if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified) &&
+            num_samples_this_voxel > 1 /* Disable stratified sampling for 1 sample voxels */)
         {
             uint64_t const sample_lane = sample_index % num_samples_per_voxel;
             uint32_t const stratum_x   = sample_lane % num_samples_sqrt;
@@ -125,10 +155,13 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                 Float const    filter_weight = filter.eval(n_center - sample);
                 uint64_t const n_voxel_index = width * ny + nx;
                 if (filter_weight > 0)
-                    occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_per_voxel;
+                    occupancy[n_voxel_index] += filter_weight * sample_occupancy * voxel_volume / num_samples_this_voxel;
             }
         }
     }
+
+    if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
+        free_bitset(&mask, allocator);
 }
 
 // Forward-mode derivatives of the smooth indicator function
@@ -242,50 +275,14 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         Float(2) / height,
         Float(2) / depth};
 
+    // Tag near-surface voxels
     Bitset mask;
     if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
     {
-        // Tag near-surface voxels using the axis-aligned bounding box
-        create_bitset(&mask, depth * height * width, allocator);
-        for (uint32_t face_index = 0; face_index < num_faces; ++face_index)
-        {
-            Point3<uint32_t> const face(&faces[3 * face_index]);
-
-            Point3<Float> const v0(&vertices[3 * face[0]]);
-            Point3<Float> const v1(&vertices[3 * face[1]]);
-            Point3<Float> const v2(&vertices[3 * face[2]]);
-
-            AABB3<Float> aabb;
-            aabb.extend(v0);
-            aabb.extend(v1);
-            aabb.extend(v2);
-
-            //
-            aabb.min -= Vector3<Float>(filter.radius);
-            aabb.max += Vector3<Float>(filter.radius);
-
-            Point3<Float> const min_grid_coord = point_to_grid_coord(aabb.min, voxel_size);
-            Point3<Float> const max_grid_coord = point_to_grid_coord(aabb.max, voxel_size);
-
-            int32_t const min_x = floor(min_grid_coord[0]);
-            int32_t const max_x = floor(max_grid_coord[0]);
-            int32_t const min_y = floor(min_grid_coord[1]);
-            int32_t const max_y = floor(max_grid_coord[1]);
-            int32_t const min_z = floor(min_grid_coord[2]);
-            int32_t const max_z = floor(max_grid_coord[2]);
-
-            for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
-            {
-                for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
-                {
-                    for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
-                    {
-                        uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
-                        mask.set(n_voxel_index);
-                    }
-                }
-            }
-        }
+        Extent<3> grid{width, height, depth};
+        create_bitset(&mask, grid.num_elements(), allocator);
+        mark_boundary_voxels<Float, 3>(vertices, faces, num_faces,
+                                       grid, filter.radius, &mask);
     }
 
     std::default_random_engine            engine(std::random_device{}());
@@ -295,20 +292,21 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
 
     uint32_t num_samples_per_voxel = mc_params.num_samples;
 
-    uint64_t num_samples = num_samples_per_voxel * depth * height * width;
-    for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
+    uint64_t num_samples_total = num_samples_per_voxel * depth * height * width;
+    for (uint64_t sample_index = 0; sample_index < num_samples_total; ++sample_index)
     {
-        // Transform sample to global space
         uint64_t const voxel_index = sample_index / num_samples_per_voxel;
 
+        // Override the number of samples for this voxel to 1, if it is constant (not near the surface)
         uint32_t num_samples_this_voxel = num_samples_per_voxel;
         if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
         {
-            // Only use a single sample for voxels that are not near the surface
             bool const is_constant_voxel = !mask.is_set(voxel_index);
             if (is_constant_voxel)
             {
-                num_samples_this_voxel     = 1u;
+                num_samples_this_voxel = 1u;
+
+                // Skip all but sample 0 for this voxel
                 uint64_t const sample_lane = sample_index % num_samples_per_voxel;
                 if (sample_lane > 0)
                     continue;
@@ -326,6 +324,7 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         uint32_t const y = (voxel_index % (height * width)) / width;
         uint32_t const x = (voxel_index % (height * width)) % width;
 
+        // Transform sample to global space
         Point3<Float> const voxel_origin = {
             x * voxel_size[0] - Float(1),
             y * voxel_size[1] - Float(1),

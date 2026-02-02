@@ -2,6 +2,7 @@
 add_library(dvx allocator.hpp allocator.cpp
                 bitset.hpp bitset.cpp
                 common.hpp 
+                coverage.hpp
                 differentiation.hpp
                 filter.hpp 
                 flags.hpp
