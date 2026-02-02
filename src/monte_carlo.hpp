@@ -109,7 +109,11 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         Point2<uint32_t> const voxel = linear_index_to_coords(voxel_index, grid);
 
         // Transform sample to global space
-        Point2<Float> const voxel_origin = Point2<Float>(voxel) * voxel_size - Float(1);
+        // TODO: Optimize these expressions:
+        // Point2<Float> const voxel_origin = Point2<Float>(voxel) * voxel_size - Float(1);
+        Point2<Float> const voxel_origin{
+            voxel.x() * voxel_size[0] - Float(1),
+            voxel.y() * voxel_size[1] - Float(1)};
 
         Point2<Float> sample;
         if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified) &&
@@ -119,7 +123,12 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
             Point2<uint32_t> const stratum(
                 /*x=*/sample_lane % num_samples_sqrt,
                 /*y=*/sample_lane / num_samples_sqrt);
-            sample = voxel_origin + (stratum + sample_local) * stratum_size;
+            // TODO: Optimize these expressions:
+            // sample = voxel_origin + (stratum + sample_local) * stratum_size;
+            sample = Point2<Float>{
+                voxel_origin[0] + (stratum[0] + sample_local[0]) * stratum_size[0],
+                voxel_origin[1] + (stratum[1] + sample_local[1]) * stratum_size[1],
+            };
         }
         else
             sample = voxel_origin + voxel_size * sample_local;
@@ -142,7 +151,11 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                 // Compute the weight using the distance from the sample to the voxel center
                 Point2<int32_t> n_voxel(nx, ny);
 
-                Point2<Float> const n_center = (Point2<Float>(n_voxel) + Float(0.5)) * voxel_size - Float(1);
+                // TODO: Optimize such expression:
+                // Point2<Float> const n_center = (Point2<Float>(n_voxel) + Float(0.5)) * voxel_size - Float(1);
+                Point2<Float> const n_center{
+                        (nx + Float(0.5)) * voxel_size[0] - Float(1),
+                        (ny + Float(0.5)) * voxel_size[1] - Float(1)};
 
                 Float const    filter_weight = filter.eval(n_center - sample);
                 uint64_t const n_voxel_index = coords_to_linear_index(n_voxel, grid);
@@ -312,7 +325,12 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         Point3<uint32_t> const voxel = linear_index_to_coords(voxel_index, grid);
 
         // Transform sample to global space
-        Point3<Float> const voxel_origin = Point3<Float>(voxel) * voxel_size - Float(1);
+        // TODO: Optimize these expressions:
+        // Point3<Float> const voxel_origin = Point3<Float>(voxel) * voxel_size - Float(1);
+        Point3<Float> const voxel_origin = {
+            voxel.x() * voxel_size[0] - Float(1),
+            voxel.y() * voxel_size[1] - Float(1),
+            voxel.z() * voxel_size[2] - Float(1)};
 
         Point3<Float> const sample = voxel_origin + voxel_size * sample_local;
 
@@ -336,7 +354,12 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     // Compute the weight using the distance from the sample to the voxel center
                     Point3<int32_t> n_voxel(nx, ny, nz);
 
-                    Point3<Float> const n_center = (Point3<Float>(n_voxel) + Float(0.5)) * voxel_size - Float(1);
+                    // TODO: Optimize these expressions:
+                    // Point3<Float> const n_center = (Point3<Float>(n_voxel) + Float(0.5)) * voxel_size - Float(1);
+                    Point3<Float> const n_center{
+                        (nx + Float(0.5)) * voxel_size[0] - Float(1),
+                        (ny + Float(0.5)) * voxel_size[1] - Float(1),
+                        (nz + Float(0.5)) * voxel_size[2] - Float(1)};
 
                     Float const    filter_weight = filter.eval(n_center - sample);
                     uint64_t const n_voxel_index = coords_to_linear_index(n_voxel, grid);
