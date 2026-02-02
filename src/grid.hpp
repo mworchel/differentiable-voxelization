@@ -56,6 +56,22 @@ inline void get_grid_support(Point<Float, N> const& query_coord, Vector<Float, N
 }
 
 template<typename Float, unsigned int N>
+inline Vector<Float, N> get_voxel_size(Extent<N> const& grid)
+{
+    if constexpr (N == 2)
+        return Vector2<Float>(
+            Float(2) / grid.width(),
+            Float(2) / grid.height());
+    else if constexpr (N == 3)
+        return Vector3<Float>(
+            Float(2) / grid.width(),
+            Float(2) / grid.height(),
+            Float(2) / grid.depth());
+    else
+        return Vector<Float, N>(Float(0));
+}
+
+template<typename Float, unsigned int N>
 inline Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
 {
     Point<Float, N> const grid_origin(Float(-1));
@@ -79,7 +95,7 @@ inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Extent<N>
 }
 
 template<unsigned int N>
-uint64_t coords_to_linear_index(Point<int32_t, N> const& coords, Extent<N> const& grid)
+inline uint64_t coords_to_linear_index(Point<int32_t, N> const& coords, Extent<N> const& grid)
 {
     // NOTE: No out-of-bounds check
 

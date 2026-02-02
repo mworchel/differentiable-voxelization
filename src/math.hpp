@@ -438,6 +438,15 @@ inline Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
     return normal * T(2) * dot(v, normal) - v;
 }
 
+template<typename T, unsigned int N>
+inline T volume(Vector<T, N> const& v)
+{
+    T result(1);
+    for (unsigned int i = 0; i < N; ++i)
+        result *= v[i];
+    return result;
+}
+
 #define DECLARE_FLOAT_DEFINES(type, N)   \
     template<typename T>                 \
     using type##N    = type<T, N>;  \
