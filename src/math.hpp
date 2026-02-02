@@ -392,7 +392,7 @@ T dot(Vector<T, N> const& left, Vector<T, N> const& right)
 }
 
 template<typename T, unsigned int N>
-T norm(Vector<T, N> const& v)
+inline T norm(Vector<T, N> const& v)
 {
     return std::sqrt(dot(v, v));
 }
@@ -427,13 +427,13 @@ void construct_frame(Vector<T, 3> const& z, Vector<T, 3>* x, Vector<T, 3>* y)
 }
 
 template<typename T, unsigned int N>
-Vector<T, N> normalize(Vector<T, N> const& v)
+inline Vector<T, N> normalize(Vector<T, N> const& v)
 {
     return v / std::sqrt(dot(v, v));
 }
 
 template<typename T, unsigned int N>
-Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
+inline Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
 {
     return normal * T(2) * dot(v, normal) - v;
 }
