@@ -4,6 +4,7 @@ add_library(dvx allocator.hpp allocator.cpp
                 common.hpp 
                 differentiation.hpp
                 filter.hpp 
+                flags.hpp
                 grid.hpp
                 math.hpp
                 monte_carlo.hpp

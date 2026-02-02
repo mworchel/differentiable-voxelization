@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <cstdint>
 #include <random>
+#include <type_traits>
 
 #include "aabb.hpp"
 #include "bitset.hpp"
 #include "common.hpp"
 #include "differentiation.hpp"
+#include "flags.hpp"
 #include "filter.hpp"
 #include "grid.hpp"
 #include "winding_number.hpp"
@@ -15,15 +17,32 @@
 namespace dvx
 {
 
-#define DVX_MC_PRIMAL_STRATIFIED_SAMPLING 1
-#define DVX_MC_PRIMAL_ADAPTIVE_SAMPLING 1
+
+enum class SamplingFlagBits : uint8_t
+{
+    None       = 0,
+    Adaptive   = 1 << 0,
+    Stratified = 1 << 1,
+};
+
+using SamplingFlags = typename std::underlying_type_t<SamplingFlagBits>;
+
+DVX_DECLARE_FLAG_OPERATORS(SamplingFlags, SamplingFlagBits);
+
+constexpr SamplingFlags DefaultSamplingFlags = SamplingFlagBits::Adaptive | SamplingFlagBits::Stratified;
+
+struct MonteCarloParameters
+{
+    uint32_t      num_samples;
+    SamplingFlags sampling_flags = DefaultSamplingFlags;
+};
 
 template<typename Float>
 void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     uint32_t const* edges, uint32_t const num_edges,
                     Float* occupancy, uint32_t const height, uint32_t const width,
-                    uint32_t num_samples_per_voxel,
-                    Filter<Float> const filter)
+                    MonteCarloParameters const& mc_params,
+                    Filter<Float> const& filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
@@ -35,24 +54,29 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
 
     Float const voxel_volume = voxel_size[0] * voxel_size[1];
 
-#if DVX_MC_PRIMAL_STRATIFIED_SAMPLING
-    // Round to next square root (TODO: do somewhere else?)
-    uint32_t const num_samples_sqrt = MAYBE_STD(ceil)(MAYBE_STD(sqrt)(num_samples_per_voxel));
-    num_samples_per_voxel = num_samples_sqrt * num_samples_sqrt;
-    Vector2<Float> const stratum_size = voxel_size / num_samples_sqrt;
-#endif
+    uint32_t num_samples_per_voxel = mc_params.num_samples;
+
+    uint32_t       num_samples_sqrt; // Used only by stratified sampling
+    Vector2<Float> stratum_size;     //
+    if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified))
+    {
+        // Round to next square root (TODO: do somewhere else?)
+        num_samples_sqrt      = MAYBE_STD(ceil)(MAYBE_STD(sqrt)(num_samples_per_voxel));
+        num_samples_per_voxel = num_samples_sqrt * num_samples_sqrt;
+        stratum_size          = voxel_size / num_samples_sqrt;
+    }
 
     uint64_t num_samples = num_samples_per_voxel * height * width;
     for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
     {
+        // Transform sample to global space
+        uint64_t const voxel_index = sample_index / num_samples_per_voxel;
+
         // Generate sample position in voxel-local space
         Point2<Float> const sample_local{
             distribution(engine),
             distribution(engine),
         };
-
-        // Transform sample to global space
-        uint64_t const voxel_index = sample_index / num_samples_per_voxel;
 
         // Linear indexing: voxel_index = height*width*z + width*y + x
         uint32_t const y = voxel_index / width;
@@ -62,19 +86,21 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
             x * voxel_size[0] - Float(1),
             y * voxel_size[1] - Float(1)};
 
-#if DVX_MC_PRIMAL_STRATIFIED_SAMPLING
-        // Compute the stratum
-        uint64_t const sample_lane = sample_index % num_samples_per_voxel;
-        uint32_t const stratum_x = sample_lane % num_samples_sqrt;
-        uint32_t const stratum_y = sample_lane / num_samples_sqrt;
-        
-        Point2<Float> const sample{
-            voxel_origin[0] + (stratum_x + sample_local[0]) * stratum_size[0],
-            voxel_origin[1] + (stratum_y + sample_local[1]) * stratum_size[1],
-        };
-#else
-        Point2<Float> const sample = voxel_origin + voxel_size * sample_local;
-#endif
+        // Compute the sample position in world space
+        Point2<Float> sample;
+        if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified))
+        {
+            uint64_t const sample_lane = sample_index % num_samples_per_voxel;
+            uint32_t const stratum_x   = sample_lane % num_samples_sqrt;
+            uint32_t const stratum_y   = sample_lane / num_samples_sqrt;
+
+            sample = Point2<Float>{
+                voxel_origin[0] + (stratum_x + sample_local[0]) * stratum_size[0],
+                voxel_origin[1] + (stratum_y + sample_local[1]) * stratum_size[1],
+            };
+        }
+        else
+            sample = voxel_origin + voxel_size * sample_local;
 
         Float sample_occupancy = generalized_winding_number<Float, 2>(vertices, num_vertices,
                                                                       edges, num_edges,
@@ -204,8 +230,8 @@ template<typename Float>
 void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     uint32_t const* faces, uint32_t num_faces,
                     Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
-                    uint32_t const      num_samples_per_voxel,
-                    Filter<Float> const filter)
+                    MonteCarloParameters const& mc_params,
+                    Filter<Float> const& filter)
 {
     // TODO: Inject into this function
     Allocator& allocator = DefaultAllocator::instance();
@@ -216,55 +242,58 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         Float(2) / height,
         Float(2) / depth};
 
-#if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
-    // Tag near-surface voxels using the axis-aligned bounding box
     Bitset mask;
-    create_bitset(&mask, depth * height * width, allocator);
-    for (uint32_t face_index = 0; face_index < num_faces; ++face_index)
+    if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
     {
-        Point3<uint32_t> const face(&faces[3 * face_index]);
-
-        Point3<Float> const v0(&vertices[3 * face[0]]);
-        Point3<Float> const v1(&vertices[3 * face[1]]);
-        Point3<Float> const v2(&vertices[3 * face[2]]);
-
-        AABB3<Float> aabb;
-        aabb.extend(v0);
-        aabb.extend(v1);
-        aabb.extend(v2);
-
-        //
-        aabb.min -= Vector3<Float>(filter.radius);
-        aabb.max += Vector3<Float>(filter.radius);
-
-        Point3<Float> const min_grid_coord = point_to_grid_coord(aabb.min, voxel_size);
-        Point3<Float> const max_grid_coord = point_to_grid_coord(aabb.max, voxel_size);
-
-        int32_t const min_x = floor(min_grid_coord[0]);
-        int32_t const max_x = floor(max_grid_coord[0]);
-        int32_t const min_y = floor(min_grid_coord[1]);
-        int32_t const max_y = floor(max_grid_coord[1]);
-        int32_t const min_z = floor(min_grid_coord[2]);
-        int32_t const max_z = floor(max_grid_coord[2]);
-
-        for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
+        // Tag near-surface voxels using the axis-aligned bounding box
+        create_bitset(&mask, depth * height * width, allocator);
+        for (uint32_t face_index = 0; face_index < num_faces; ++face_index)
         {
-            for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
+            Point3<uint32_t> const face(&faces[3 * face_index]);
+
+            Point3<Float> const v0(&vertices[3 * face[0]]);
+            Point3<Float> const v1(&vertices[3 * face[1]]);
+            Point3<Float> const v2(&vertices[3 * face[2]]);
+
+            AABB3<Float> aabb;
+            aabb.extend(v0);
+            aabb.extend(v1);
+            aabb.extend(v2);
+
+            //
+            aabb.min -= Vector3<Float>(filter.radius);
+            aabb.max += Vector3<Float>(filter.radius);
+
+            Point3<Float> const min_grid_coord = point_to_grid_coord(aabb.min, voxel_size);
+            Point3<Float> const max_grid_coord = point_to_grid_coord(aabb.max, voxel_size);
+
+            int32_t const min_x = floor(min_grid_coord[0]);
+            int32_t const max_x = floor(max_grid_coord[0]);
+            int32_t const min_y = floor(min_grid_coord[1]);
+            int32_t const max_y = floor(max_grid_coord[1]);
+            int32_t const min_z = floor(min_grid_coord[2]);
+            int32_t const max_z = floor(max_grid_coord[2]);
+
+            for (int32_t nz = std::max(min_z, 0); nz < std::min(static_cast<int32_t const>(depth), max_z + 1); ++nz)
             {
-                for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                for (int32_t ny = std::max(min_y, 0); ny < std::min(static_cast<int32_t const>(height), max_y + 1); ++ny)
                 {
-                    uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
-                    mask.set(n_voxel_index);
+                    for (int32_t nx = std::max(min_x, 0); nx < std::min(static_cast<int32_t const>(width), max_x + 1); ++nx)
+                    {
+                        uint64_t const n_voxel_index = width * (height * nz + ny) + nx;
+                        mask.set(n_voxel_index);
+                    }
                 }
             }
         }
     }
-#endif
 
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
 
     Float const voxel_volume = voxel_size[0] * voxel_size[1] * voxel_size[2];
+
+    uint32_t num_samples_per_voxel = mc_params.num_samples;
 
     uint64_t num_samples = num_samples_per_voxel * depth * height * width;
     for (uint64_t sample_index = 0; sample_index < num_samples; ++sample_index)
@@ -272,15 +301,19 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         // Transform sample to global space
         uint64_t const voxel_index = sample_index / num_samples_per_voxel;
 
-#if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
-        // Only use a single sample for voxels that are not near the surface
-        bool const     is_constant_voxel      = !mask.is_set(voxel_index);
-        uint32_t const num_samples_this_voxel = is_constant_voxel ? 1u : num_samples_per_voxel;
-        if (is_constant_voxel && (sample_index % num_samples_per_voxel) > 0)
-            continue;
-#else
-        uint32_t const num_samples_this_voxel = num_samples_per_voxel;
-#endif
+        uint32_t num_samples_this_voxel = num_samples_per_voxel;
+        if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
+        {
+            // Only use a single sample for voxels that are not near the surface
+            bool const is_constant_voxel = !mask.is_set(voxel_index);
+            if (is_constant_voxel)
+            {
+                num_samples_this_voxel     = 1u;
+                uint64_t const sample_lane = sample_index % num_samples_per_voxel;
+                if (sample_lane > 0)
+                    continue;
+            }
+        }
 
         // Generate sample position in voxel-local space
         Point3<Float> const sample_local{
@@ -332,9 +365,8 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
         }
     }
 
-#if DVX_MC_PRIMAL_ADAPTIVE_SAMPLING
-    free_bitset(&mask, allocator);
-#endif
+    if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive))
+        free_bitset(&mask, allocator);
 }
 
 // Forward-mode derivatives of the smooth indicator function
