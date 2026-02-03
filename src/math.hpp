@@ -16,15 +16,17 @@ Float kahan(Float a, Float b, Float c, Float d)
     return fma(a, b, -cd) - error;
 }
 
-#define VECTOR_MAKE_CONVENIENCE_ACCESSOR(name, index) \
-    inline T& name()                                  \
-    {                                                 \
-        return (*this)[index];                        \
-    }                                                 \
-                                                      \
-    inline T const& name() const                      \
-    {                                                 \
-        return (*this)[index];                        \
+#define VECTOR_MAKE_CONVENIENCE_ACCESSOR(name, index, N) \
+    template<typename = std::enable_if_t<(index < N)>>   \
+    inline T& name()                                     \
+    {                                                    \
+        return (*this)[index];                           \
+    }                                                    \
+                                                         \
+    template<typename = std::enable_if_t<(index < N)>>   \
+    inline T const& name() const                         \
+    {                                                    \
+        return (*this)[index];                           \
     }
 
 #define DEFINE_BINARY_OPERATOR(type1, type2, rtype, op)                                                                                    \
@@ -295,68 +297,44 @@ public:
         return *this;
     }
 
-private:
+protected:
     T m_data[N];
 };
 
 template<typename T, unsigned int N>
 class Vector : public VectorBase<T, N>
 {
-    using VectorBase<T, N>::VectorBase;
-};
-
-template<typename T>
-class Vector<T, 2U> : public VectorBase<T, 2U>
-{
 public:
-    using VectorBase<T, 2U>::VectorBase;
+    using VectorBase<T, N>::VectorBase;
 
+    template<typename = std::enable_if_t<(N == 2)>>
     inline Vector(T x, T y)
     {
-        this->x() = x;
-        this->y() = y;
+        VectorBase<T, N>::m_data[0] = x;
+        VectorBase<T, N>::m_data[1] = y;
     }
 
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(x, 0);
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(y, 1);
-};
-
-template<typename T>
-class Vector<T, 3U> : public VectorBase<T, 3U>
-{
-public:
-    using VectorBase<T, 3U>::VectorBase;
-
+    template<typename = std::enable_if_t<(N == 3)>>
     inline Vector(T x, T y, T z)
     {
-        this->x() = x;
-        this->y() = y;
-        this->z() = z;
+        VectorBase<T, N>::m_data[0] = x;
+        VectorBase<T, N>::m_data[1] = y;
+        VectorBase<T, N>::m_data[2] = z;
     }
 
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(x, 0);
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(y, 1);
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(z, 2);
-};
-
-template<typename T>
-class Vector<T, 4U> : public VectorBase<T, 4U>
-{
-public:
-    using VectorBase<T, 4U>::VectorBase;
-
+    template<typename = std::enable_if_t<(N == 4)>>
     inline Vector(T x, T y, T z, T w)
     {
-        this->x() = x;
-        this->y() = y;
-        this->z() = z;
-        this->w() = w;
+        VectorBase<T, N>::m_data[0] = x;
+        VectorBase<T, N>::m_data[1] = y;
+        VectorBase<T, N>::m_data[2] = z;
+        VectorBase<T, N>::m_data[3] = w;
     }
 
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(x, 0);
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(y, 1);
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(z, 2);
-    VECTOR_MAKE_CONVENIENCE_ACCESSOR(w, 3);
+    VECTOR_MAKE_CONVENIENCE_ACCESSOR(x, 0, N);
+    VECTOR_MAKE_CONVENIENCE_ACCESSOR(y, 1, N);
+    VECTOR_MAKE_CONVENIENCE_ACCESSOR(z, 2, N);
+    VECTOR_MAKE_CONVENIENCE_ACCESSOR(w, 3, N);
 };
 
 DEFINE_BINARY_OPERATOR_SCALAR(Vector, *)
