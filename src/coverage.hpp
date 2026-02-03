@@ -83,17 +83,12 @@ void mark_boundary_voxels(Float const* vertices, uint32_t const* simplices, uint
 {
     static_assert(N == 2 || N == 3, "Dimension `N` must be 2 or 3.");
 
-    // TODO: Lift assumption of grid being in [-1,1]^3
-    Vector<Float, N> voxel_size(2);
-    for (unsigned int i = 0; i < N; ++i)
-        voxel_size[i] /= grid[i];
-
     MarkBoundaryVoxelsOp<Float, N> op{
         .vertices      = vertices,
         .simplices     = simplices,
         .num_simplices = num_simplices,
         .grid          = grid,
-        .voxel_size    = voxel_size,
+        .voxel_size    = get_voxel_size(grid),
         .shell_radius  = shell_radius,
         .mask          = *mask};
 
