@@ -22,8 +22,6 @@
 
 namespace nb = nanobind;
 
-static bool suppress_warnings = false;
-
 // Checks if a each nanobind array is allocated on the given device
 template<typename Array, typename... Arrays>
 void check_on_device(int device_type, int device_id, Array&& a, Arrays&&... arrays)
@@ -100,20 +98,6 @@ void voxelize_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
     dvx::Filter<Float> filter{
         .type   = dvx::FilterType::Box,
         .radius = filter_radius};
-
-    if (!suppress_warnings && num_samples_per_voxel < 16)
-    {
-        for (int i = 0; i < dim; ++i)
-        {
-            Float voxel_spacing = Float(2) / occupancy.shape(i);
-            if (filter.radius < voxel_spacing)
-            {
-                nb::print(dvx::format_message("Warning: The filter radius (%f) is smaller than the space between voxels in dimension %d (%f).\n"
-                                              "This can result in voxels without valid samples. Consider increasing the sample count or the filter radius.",
-                                              filter.radius, i, voxel_spacing));
-            }
-        }
-    }
 
     dvx::MonteCarloParameters mc_params{
         .num_samples    = num_samples_per_voxel,
@@ -255,10 +239,6 @@ NB_MODULE(dvx_ext, m)
 
     m.def("build_type", [=]()
           { return build_type; });
-    m.def("mute", [=]()
-          { suppress_warnings = true; });
-    m.def("unmute", [=]()
-          { suppress_warnings = false; });
 
     nb::enum_<dvx::SamplingFlagBits>(m, "SamplingFlags", nb::is_arithmetic())
         .value("Empty", dvx::SamplingFlagBits::None)

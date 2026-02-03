@@ -38,6 +38,22 @@ struct MonteCarloParameters
     SamplingFlags sampling_flags = DefaultSamplingFlags;
 };
 
+template<typename Float, unsigned int N>
+void maybe_emit_small_filter_warning(char const* caller_name, uint32_t num_samples, Vector<Float, N> const& half_voxel_size, Filter<Float> const& filter)
+{
+    for (unsigned int i = 0; (i < N) && num_samples < 16; ++i)
+    {
+        if (filter.radius < half_voxel_size[i])
+        {
+            log_message(LogLevel::Warn, "%s: The filter radius (%f) is smaller than half a voxel in dimension %d (%f). "
+                                        "For low sample counts, this might lead to voxels without valid samples. "
+                                        "Consider increasing the sample count or the filter radius.",
+                                        caller_name, filter.radius, i, half_voxel_size[i]);
+            break; // Only emit this warning once
+        }
+    }
+}
+
 template<typename Float>
 void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     uint32_t const* edges, uint32_t const num_edges,
@@ -56,7 +72,9 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector2<Float> const voxel_size                = get_voxel_size<Float>(grid);
     Vector2<Float> const half_voxel_size           = Float(0.5) * voxel_size;
-    Vector2<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);
+    Vector2<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);    
+
+    maybe_emit_small_filter_warning("voxelize_mc_2d()", mc_params.num_samples, half_voxel_size, filter);
 
     // Tag near-surface voxels
     Bitset mask;
@@ -288,6 +306,8 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
     Vector3<Float> const voxel_size                = get_voxel_size<Float>(grid);
     Vector3<Float> const half_voxel_size           = Float(0.5) * voxel_size;
     Vector3<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);
+
+    maybe_emit_small_filter_warning("voxelize_mc_3d()", mc_params.num_samples, half_voxel_size, filter);
 
     // Tag near-surface voxels
     Bitset mask;
