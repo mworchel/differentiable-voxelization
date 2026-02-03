@@ -88,7 +88,7 @@ void mark_boundary_voxels(Float const* vertices, uint32_t const* simplices, uint
         .simplices     = simplices,
         .num_simplices = num_simplices,
         .grid          = grid,
-        .voxel_size    = get_voxel_size(grid),
+        .voxel_size    = get_voxel_size<Float>(grid),
         .shell_radius  = shell_radius,
         .mask          = *mask};
 
