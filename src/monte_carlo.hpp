@@ -61,7 +61,7 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     MonteCarloParameters const& mc_params,
                     Filter<Float> const& filter)
 {
-    log_message(LogLevel::Trace, "voxelize_mc_2d(): mesh=[%d vertices, %d simplices] grid=[%d,%d] mc=[%d samples, stratified:%d, adaptive:%d]",
+    log_message(LogLevel::Trace, "dvx::voxelize_mc_2d(): mesh=[%d vertices, %d simplices] grid=[%d,%d] mc=[%d samples, stratified:%d, adaptive:%d]",
                 num_vertices, num_edges,
                 grid.width(), grid.height(),
                 mc_params.num_samples, has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified), has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive));
@@ -74,7 +74,7 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
     Vector2<Float> const half_voxel_size           = Float(0.5) * voxel_size;
     Vector2<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);    
 
-    maybe_emit_small_filter_warning("voxelize_mc_2d()", mc_params.num_samples, half_voxel_size, filter);
+    maybe_emit_small_filter_warning("dvx::voxelize_mc_2d()", mc_params.num_samples, half_voxel_size, filter);
 
     // Tag near-surface voxels
     Bitset mask;
@@ -100,7 +100,7 @@ void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         num_samples_sqrt      = MAYBE_STD(ceil)(MAYBE_STD(sqrt)(num_samples_per_voxel));
         num_samples_per_voxel = num_samples_sqrt * num_samples_sqrt;
         if (num_samples_per_voxel != mc_params.num_samples)
-            log_message(LogLevel::Trace, "voxelize_mc_2d(): Increased sample count from %d to %d (=%d*%d) for stratified sampling.",
+            log_message(LogLevel::Trace, "dvx::voxelize_mc_2d(): Increased sample count from %d to %d (=%d*%d) for stratified sampling.",
                         mc_params.num_samples, num_samples_per_voxel, num_samples_sqrt, num_samples_sqrt);
         stratum_size          = voxel_size / num_samples_sqrt;
     }
@@ -307,7 +307,7 @@ void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
     Vector3<Float> const half_voxel_size           = Float(0.5) * voxel_size;
     Vector3<Float> const half_voxel_size_minus_one = half_voxel_size - Float(1);
 
-    maybe_emit_small_filter_warning("voxelize_mc_3d()", mc_params.num_samples, half_voxel_size, filter);
+    maybe_emit_small_filter_warning("dvx::voxelize_mc_3d()", mc_params.num_samples, half_voxel_size, filter);
 
     // Tag near-surface voxels
     Bitset mask;
