@@ -119,7 +119,9 @@ void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
                          nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
                          nb::ndarray<Float, nb::c_contig> const&    d_vertices,
                          nb::ndarray<Float, nb::c_contig>&          d_occupancy,
-                         uint32_t num_samples_per_simplex, Float filter_radius)
+                         uint32_t                                   num_samples_per_simplex,
+                         dvx::SamplingFlags                         sampling_flags,
+                         Float                                      filter_radius)
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
@@ -129,11 +131,15 @@ void voxelize_forward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
         .type   = dvx::FilterType::Box,
         .radius = filter_radius};
 
+    dvx::MonteCarloParameters mc_params{
+        .num_samples    = num_samples_per_simplex,
+        .sampling_flags = sampling_flags};
+
     if (dim == 2)
         dvx::d_voxelize_mc_2d<Float, dvx::DifferentiationMode::Forward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                                         occupancy.data(), occupancy.shape(0), occupancy.shape(1),
                                                                         d_vertices.data(), d_occupancy.data(),
-                                                                        num_samples_per_simplex, filter);
+                                                                        mc_params, filter);
     if (dim == 3)
         dvx::d_voxelize_mc_3d<Float, dvx::DifferentiationMode::Forward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                                         occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
@@ -147,7 +153,9 @@ void voxelize_backward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
                           nb::ndarray<Float, nb::c_contig>&          occupancy /*unused*/,
                           nb::ndarray<Float, nb::c_contig>&          d_vertices,
                           nb::ndarray<Float, nb::c_contig> const&    d_occupancy,
-                          uint32_t num_samples_per_simplex, Float filter_radius)
+                          uint32_t                                   num_samples_per_simplex,
+                          dvx::SamplingFlags                         sampling_flags,
+                          Float                                      filter_radius)
 {
     validate_common_differential_voxelize_arguments(vertices, simplices, occupancy, d_vertices, d_occupancy);
 
@@ -157,11 +165,15 @@ void voxelize_backward_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
         .type   = dvx::FilterType::Box,
         .radius = filter_radius};
 
+    dvx::MonteCarloParameters mc_params{
+        .num_samples    = num_samples_per_simplex,
+        .sampling_flags = sampling_flags};
+
     if (dim == 2)
         dvx::d_voxelize_mc_2d<Float, dvx::DifferentiationMode::Backward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                                          occupancy.data(), occupancy.shape(0), occupancy.shape(1),
                                                                          d_vertices.data(), d_occupancy.data(),
-                                                                         num_samples_per_simplex, filter);
+                                                                         mc_params, filter);
     if (dim == 3)
         dvx::d_voxelize_mc_3d<Float, dvx::DifferentiationMode::Backward>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
                                                                          occupancy.data(), occupancy.shape(0), occupancy.shape(1), occupancy.shape(2),
@@ -247,12 +259,12 @@ NB_MODULE(dvx_ext, m)
 
     m.attr("DefaultSamplingFlags") = dvx::DefaultSamplingFlags;
 
-#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                \
-    m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("sampling_flags") = dvx::DefaultSamplingFlags, nb::arg("filter_radius"));                                         \
-    m.def("voxelize_forward_mc" tag, voxelize_forward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius"));   \
-    m.def("voxelize_backward_mc" tag, voxelize_backward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("filter_radius")); \
-    m.def("voxelize_cf" tag, voxelize_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                                \
-    m.def("voxelize_forward_cf" tag, voxelize_forward_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));                                                                 \
+#define BIND_FUNCTIONS(type, tag)                                                                                                                                                                                                                                                                       \
+    m.def("voxelize_mc" tag, voxelize_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("num_samples_per_voxel"), nb::arg("sampling_flags") = dvx::DefaultSamplingFlags, nb::arg("filter_radius"));                                                                    \
+    m.def("voxelize_forward_mc" tag, voxelize_forward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("sampling_flags") = dvx::DefaultSamplingFlags, nb::arg("filter_radius"));   \
+    m.def("voxelize_backward_mc" tag, voxelize_backward_mc<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"), nb::arg("num_samples_per_simplex"), nb::arg("sampling_flags") = dvx::DefaultSamplingFlags, nb::arg("filter_radius")); \
+    m.def("voxelize_cf" tag, voxelize_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"));                                                                                                                                                                                       \
+    m.def("voxelize_forward_cf" tag, voxelize_forward_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));                                                                                                                        \
     m.def("voxelize_backward_cf" tag, voxelize_backward_cf<type>, nb::arg("vertices"), nb::arg("simplices"), nb::arg("occupancy"), nb::arg("d_vertices"), nb::arg("d_occupancy"));
 
     BIND_FUNCTIONS(float, "_f32")

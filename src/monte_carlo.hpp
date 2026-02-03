@@ -204,18 +204,16 @@ template<typename Float, DifferentiationMode Mode>
 void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                       uint32_t const* edges, uint32_t const num_edges,
                       Float* occupancy, uint32_t const height, uint32_t const width,
-                      dIn<Float, Mode>*   d_vertices,
-                      dOut<Float, Mode>*  d_occupancy,
-                      uint32_t const      num_samples_per_simplex,
-                      Filter<Float> const filter)
+                      dIn<Float, Mode>*           d_vertices,
+                      dOut<Float, Mode>*          d_occupancy,
+                      MonteCarloParameters const& mc_params,
+                      Filter<Float> const         filter)
 {
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
 
-    // TODO: Lift assumption of grid being in [-1,1]^3
-    Vector2<Float> const voxel_size{
-        Float(2) / width,
-        Float(2) / height};
+    Extent<2> const      grid{width, height};
+    Vector2<Float> const voxel_size = get_voxel_size<Float>(grid);
 
     // Compute the boundary term (integration over edges)
     for (uint32_t e = 0; e < num_edges; ++e)
@@ -236,9 +234,17 @@ void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         // Monte Carlo integration over the edge
         // TODO: Stratified sampling?
         // TODO: Quadrature?
+        uint32_t const num_samples_per_simplex = mc_params.num_samples;
         for (uint32_t sample_index = 0; sample_index < num_samples_per_simplex; ++sample_index)
         {
-            Float const u = distribution(engine);
+            Float u = distribution(engine);
+
+            if (has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified))
+            {
+                Float const    stratum_size  = Float(1) / static_cast<Float>(num_samples_per_simplex);
+                uint32_t const stratum_index = sample_index;
+                u = (static_cast<Float>(stratum_index) + u) * stratum_size;
+            }
 
             // Compute normal velocities for all vertices
             Vector2<Float> const d_xbn_d_v0 = normal * (1 - u);
@@ -292,7 +298,6 @@ void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
         }
     }
 }
-
 
 template<typename Float>
 void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
@@ -423,11 +428,8 @@ void d_voxelize_mc_3d(Float const* vertices, uint32_t const num_vertices,
     std::default_random_engine            engine(std::random_device{}());
     std::uniform_real_distribution<Float> distribution;
 
-    // TODO: Lift assumption of grid being in [-1,1]^3
-    Vector3<Float> const voxel_size{
-        Float(2) / width,
-        Float(2) / height,
-        Float(2) / depth};
+    Extent<3> const      grid{width, height, depth};
+    Vector3<Float> const voxel_size = get_voxel_size<Float>(grid);
 
     // Compute the boundary term (integration over edges)
     for (uint32_t f = 0; f < num_faces; ++f)
