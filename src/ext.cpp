@@ -43,22 +43,22 @@ void validate_common_voxelize_arguments(nb::ndarray<Float, nb::c_contig> const& 
     unsigned int dim = static_cast<unsigned int>(occupancy.ndim());
 
     if (dim != 2 && dim != 3)
-        throw std::invalid_argument(format_message("Expected occupancy grid with shape (h,w) or (d,h,w) but array has %d dimensions", occupancy.ndim()));
+        throw std::invalid_argument(dvx::format_message("Expected occupancy grid with shape (h,w) or (d,h,w) but array has %d dimensions", occupancy.ndim()));
 
     if ((occupancy.shape(0) == 0) || (occupancy.shape(1) == 0) || ((dim > 2) && (occupancy.shape(2) == 0)))
         throw std::invalid_argument("All dimensions of the ccupancy grid must be > 0");
 
     if (vertices.ndim() != 2)
-        throw std::invalid_argument(format_message("Expected vertices with shape (n,%d) but array has %d dimensions", dim, vertices.ndim()));
+        throw std::invalid_argument(dvx::format_message("Expected vertices with shape (n,%d) but array has %d dimensions", dim, vertices.ndim()));
 
     if (vertices.shape(1) != dim)
-        throw std::invalid_argument(format_message("Expected vertices with shape (n,%d) but array has shape (n,%d)", dim, vertices.shape(1)));
+        throw std::invalid_argument(dvx::format_message("Expected vertices with shape (n,%d) but array has shape (n,%d)", dim, vertices.shape(1)));
 
     if (simplices.ndim() != 2)
-        throw std::invalid_argument(format_message("Expected simplices with shape (n,%d) but array has %d dimensions", dim, simplices.ndim()));
+        throw std::invalid_argument(dvx::format_message("Expected simplices with shape (n,%d) but array has %d dimensions", dim, simplices.ndim()));
 
     if (simplices.shape(1) != dim)
-        throw std::invalid_argument(format_message("Expected simplices with shape (n,%d) but array has shape (n,%d)", dim, simplices.shape(1)));
+        throw std::invalid_argument(dvx::format_message("Expected simplices with shape (n,%d) but array has shape (n,%d)", dim, simplices.shape(1)));
 
     check_on_device(vertices.device_type(), vertices.device_id(), vertices, simplices, occupancy);
 }
@@ -76,12 +76,12 @@ void validate_common_differential_voxelize_arguments(nb::ndarray<Float, nb::c_co
     validate_common_voxelize_arguments(d_vertices, simplices, d_occupancy);
 
     if (occupancy.ndim() != d_occupancy.ndim())
-        throw std::invalid_argument(format_message("Dimension mismatch between `occupancy` (dim=%d) and `d_occupancy` (dim=%d)", occupancy.ndim(), d_occupancy.ndim()));
+        throw std::invalid_argument(dvx::format_message("Dimension mismatch between `occupancy` (dim=%d) and `d_occupancy` (dim=%d)", occupancy.ndim(), d_occupancy.ndim()));
 
     for (size_t i = 0; i < occupancy.ndim(); ++i)
     {
         if (occupancy.shape(i) != d_occupancy.shape(i))
-            throw std::invalid_argument(format_message("Shape mismatch in dimension `%d` between `occupancy` (=%d) and `d_occupancy` (=%d)", i, occupancy.shape(i), d_occupancy.shape(i)));
+            throw std::invalid_argument(dvx::format_message("Shape mismatch in dimension `%d` between `occupancy` (=%d) and `d_occupancy` (=%d)", i, occupancy.shape(i), d_occupancy.shape(i)));
     }
 }
 
@@ -108,9 +108,9 @@ void voxelize_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
             Float voxel_spacing = Float(2) / occupancy.shape(i);
             if (filter.radius < voxel_spacing)
             {
-                nb::print(format_message("Warning: The filter radius (%f) is smaller than the space between voxels in dimension %d (%f).\n"
-                                         "This can result in voxels without valid samples. Consider increasing the sample count or the filter radius.",
-                                         filter.radius, i, voxel_spacing));
+                nb::print(dvx::format_message("Warning: The filter radius (%f) is smaller than the space between voxels in dimension %d (%f).\n"
+                                              "This can result in voxels without valid samples. Consider increasing the sample count or the filter radius.",
+                                              filter.radius, i, voxel_spacing));
             }
         }
     }
@@ -277,4 +277,16 @@ NB_MODULE(dvx_ext, m)
 
     BIND_FUNCTIONS(float, "_f32")
     BIND_FUNCTIONS(double, "_f64")
+
+    nb::enum_<dvx::LogLevel>(m, "LogLevel")
+        .value("Trace", dvx::LogLevel::Trace)
+        .value("Debug", dvx::LogLevel::Debug)
+        .value("Info", dvx::LogLevel::Info)
+        .value("Warn", dvx::LogLevel::Warn)
+        .value("Error", dvx::LogLevel::Error);
+
+    m.def("set_log_level", dvx::set_log_level, nb::arg("log_level"));
+
+    // Redirect log output to Python
+    dvx::set_log_output_function([](char const* str){ nb::print(str); });
 }
