@@ -337,6 +337,13 @@ public:
     VECTOR_MAKE_CONVENIENCE_ACCESSOR(w, 3, N);
 };
 
+template<typename T, unsigned int N>
+Vector<T, N> load_vector(T const* data)
+{
+    // TODO: Discourage this constructor
+    return Vector<T, N>(data);
+}
+
 DEFINE_BINARY_OPERATOR_SCALAR(Vector, *)
 DEFINE_BINARY_OPERATOR_SCALAR(Vector, /)
 DEFINE_BINARY_OPERATOR_SCALAR(Vector, +)
@@ -447,6 +454,13 @@ class Point : public Vector<T, N>
 public:
     using Vector<T, N>::Vector;
 };
+
+template<typename T, unsigned int N>
+Point<T, N> load_point(T const* data)
+{
+    // TODO: Discourage this constructor private
+    return Point<T, N>(data);
+}
 
 DEFINE_BINARY_OPERATOR_SCALAR(Point, +)
 DEFINE_BINARY_OPERATOR_SCALAR(Point, -)
