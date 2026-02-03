@@ -57,17 +57,19 @@ void maybe_emit_small_filter_warning(char const* caller_name, uint32_t num_sampl
 template<typename Float>
 void voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
                     uint32_t const* edges, uint32_t const num_edges,
-                    Float* occupancy, Extent<2> const& grid,
+                    Float* occupancy, uint32_t const height, uint32_t const width,
                     MonteCarloParameters const& mc_params,
                     Filter<Float> const& filter)
 {
     log_message(LogLevel::Trace, "dvx::voxelize_mc_2d(): mesh=[%d vertices, %d simplices] grid=[%d,%d] mc=[%d samples, stratified:%d, adaptive:%d]",
                 num_vertices, num_edges,
-                grid.width(), grid.height(),
+                width, height,
                 mc_params.num_samples, has_flag(mc_params.sampling_flags, SamplingFlagBits::Stratified), has_flag(mc_params.sampling_flags, SamplingFlagBits::Adaptive));
 
     // TODO: Inject into this function
     Allocator& allocator = DefaultAllocator::instance();
+
+    Extent<2> const grid{width, height};
 
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector2<Float> const voxel_size                = get_voxel_size<Float>(grid);
@@ -295,12 +297,14 @@ void d_voxelize_mc_2d(Float const* vertices, uint32_t const num_vertices,
 template<typename Float>
 void voxelize_mc_3d(Float const* vertices, uint32_t num_vertices,
                     uint32_t const* faces, uint32_t num_faces,
-                    Float* occupancy, Extent<3> const& grid,
+                    Float* occupancy, uint32_t const depth, uint32_t const height, uint32_t const width,
                     MonteCarloParameters const& mc_params,
                     Filter<Float> const& filter)
 {
     // TODO: Inject into this function
     Allocator& allocator = DefaultAllocator::instance();
+
+    Extent<3> const grid{width, height, depth};
 
     // TODO: Lift assumption of grid being in [-1,1]^3
     Vector3<Float> const voxel_size                = get_voxel_size<Float>(grid);

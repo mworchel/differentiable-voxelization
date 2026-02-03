@@ -105,11 +105,11 @@ void voxelize_mc(nb::ndarray<Float, nb::c_contig> const&    vertices,
 
     if (dim == 2)
         dvx::voxelize_mc_2d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                   occupancy.data(), dvx::Extent<2>{/*width=*/uint32_t(occupancy.shape(1)), /*height=*/uint32_t(occupancy.shape(0))}, 
+                                   occupancy.data(), occupancy.shape(0), occupancy.shape(1), 
                                    mc_params, filter);
     if (dim == 3)
         dvx::voxelize_mc_3d<Float>(vertices.data(), vertices.shape(0), simplices.data(), simplices.shape(0),
-                                   occupancy.data(), dvx::Extent<3>{/*width=*/uint32_t(occupancy.shape(2)), /*height=*/uint32_t(occupancy.shape(1)), /*depth=*/uint32_t(occupancy.shape(0))}, 
+                                   occupancy.data(),occupancy.shape(0), occupancy.shape(1), occupancy.shape(2), 
                                    mc_params, filter);
 }
 
