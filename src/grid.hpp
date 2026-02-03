@@ -85,7 +85,7 @@ inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Extent<N>
         return Point<uint32_t, N>(
             /*x=*/index % grid.width(),
             /*y=*/index / grid.width());
-    else if constexpr (N == 2)
+    else if constexpr (N == 3)
         return Point<uint32_t, N>(
             /*x=*/(index % (grid.width() * grid.height())) % grid.width(),
             /*y=*/(index % (grid.width() * grid.height())) / grid.width(),
