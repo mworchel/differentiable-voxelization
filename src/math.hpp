@@ -377,9 +377,15 @@ T dot(Vector<T, N> const& left, Vector<T, N> const& right)
 }
 
 template<typename T, unsigned int N>
+inline T squared_norm(Vector<T, N> const& v)
+{
+    return dot(v, v);
+}
+
+template<typename T, unsigned int N>
 inline T norm(Vector<T, N> const& v)
 {
-    return std::sqrt(dot(v, v));
+    return std::sqrt(squared_norm(v));
 }
 
 template<typename T>
