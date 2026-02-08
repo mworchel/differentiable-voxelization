@@ -335,14 +335,19 @@ public:
     VECTOR_MAKE_CONVENIENCE_ACCESSOR(y, 1, N);
     VECTOR_MAKE_CONVENIENCE_ACCESSOR(z, 2, N);
     VECTOR_MAKE_CONVENIENCE_ACCESSOR(w, 3, N);
-};
 
-template<typename T, unsigned int N>
-Vector<T, N> load_vector(T const* data)
-{
-    // TODO: Discourage this constructor
-    return Vector<T, N>(data);
-}
+    static Vector<T, N> load(T const* data, uint32_t const offset, uint32_t const stride = 1u)
+    {
+        // Load data from an array
+        Vector<T, N> out;
+        
+        T const* data_first = data + offset;
+        for (unsigned int i = 0; i < N; ++i)
+            out.m_data[i] = data_first[i * stride];
+
+        return out;
+    }
+};
 
 DEFINE_BINARY_OPERATOR_SCALAR(Vector, *)
 DEFINE_BINARY_OPERATOR_SCALAR(Vector, /)
@@ -459,14 +464,19 @@ class Point : public Vector<T, N>
 {
 public:
     using Vector<T, N>::Vector;
-};
 
-template<typename T, unsigned int N>
-Point<T, N> load_point(T const* data)
-{
-    // TODO: Discourage this constructor private
-    return Point<T, N>(data);
-}
+    static Point<T, N> load(T const* data, uint32_t const offset, uint32_t const stride = 1u)
+    {
+        // Load data from an array
+        Point<T, N> out;
+        
+        T const* data_first = data + offset;
+        for (unsigned int i = 0; i < N; ++i)
+            out.m_data[i] = data_first[i * stride];
+
+        return out;
+    }
+};
 
 DEFINE_BINARY_OPERATOR_SCALAR(Point, +)
 DEFINE_BINARY_OPERATOR_SCALAR(Point, -)
