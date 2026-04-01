@@ -17,14 +17,14 @@ Float kahan(Float a, Float b, Float c, Float d)
 }
 
 #define VECTOR_MAKE_CONVENIENCE_ACCESSOR(name, index, N) \
-    template<typename = std::enable_if_t<(index < N)>>   \
-    inline T& name()                                     \
+    inline T& name()                         \
+        requires(index < N)                              \
     {                                                    \
         return (*this)[index];                           \
     }                                                    \
                                                          \
-    template<typename = std::enable_if_t<(index < N)>>   \
-    inline T const& name() const                         \
+    inline T const& name() const             \
+        requires(index < N)                              \
     {                                                    \
         return (*this)[index];                           \
     }
@@ -307,23 +307,23 @@ class Vector : public VectorBase<T, N>
 public:
     using VectorBase<T, N>::VectorBase;
 
-    template<typename = std::enable_if_t<(N == 2)>>
     inline Vector(T x, T y)
+        requires (N == 2)
     {
         VectorBase<T, N>::m_data[0] = x;
         VectorBase<T, N>::m_data[1] = y;
     }
 
-    template<typename = std::enable_if_t<(N == 3)>>
     inline Vector(T x, T y, T z)
+        requires (N == 3)
     {
         VectorBase<T, N>::m_data[0] = x;
         VectorBase<T, N>::m_data[1] = y;
         VectorBase<T, N>::m_data[2] = z;
     }
 
-    template<typename = std::enable_if_t<(N == 4)>>
     inline Vector(T x, T y, T z, T w)
+        requires (N == 4)
     {
         VectorBase<T, N>::m_data[0] = x;
         VectorBase<T, N>::m_data[1] = y;
@@ -382,13 +382,13 @@ T dot(Vector<T, N> const& left, Vector<T, N> const& right)
 }
 
 template<typename T, unsigned int N>
-inline T squared_norm(Vector<T, N> const& v)
+T squared_norm(Vector<T, N> const& v)
 {
     return dot(v, v);
 }
 
 template<typename T, unsigned int N>
-inline T norm(Vector<T, N> const& v)
+T norm(Vector<T, N> const& v)
 {
     return std::sqrt(squared_norm(v));
 }
@@ -423,19 +423,19 @@ void construct_frame(Vector<T, 3> const& z, Vector<T, 3>* x, Vector<T, 3>* y)
 }
 
 template<typename T, unsigned int N>
-inline Vector<T, N> normalize(Vector<T, N> const& v)
+Vector<T, N> normalize(Vector<T, N> const& v)
 {
     return v / std::sqrt(dot(v, v));
 }
 
 template<typename T, unsigned int N>
-inline Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
+Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
 {
     return normal * T(2) * dot(v, normal) - v;
 }
 
 template<typename T, unsigned int N>
-inline T volume(Vector<T, N> const& v)
+T volume(Vector<T, N> const& v)
 {
     T result(1);
     for (unsigned int i = 0; i < N; ++i)
