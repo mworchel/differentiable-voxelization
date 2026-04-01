@@ -1,34 +1,9 @@
 #include "bitset.hpp"
 
-#include <cassert>
 #include <cstring>
 
 namespace dvx
 {
-
-void Bitset::set(uint64_t index)
-{
-    uint32_t const element_index = index / NumBitsPerElement;
-    uint8_t const  bit_index     = index % NumBitsPerElement;
-
-    // Check oob
-    assert(element_index < num_elements);
-    assert(bit_index < NumBitsPerElement);
-
-    elements[element_index] |= (1 << bit_index);
-}
-
-bool Bitset::is_set(uint64_t index)
-{
-    uint32_t const element_index = index / NumBitsPerElement;
-    uint8_t const  bit_index     = index % NumBitsPerElement;
-
-    // Check oob
-    assert(element_index < num_elements);
-    assert(bit_index < NumBitsPerElement);
-
-    return elements[element_index] & (1 << bit_index);
-}
 
 bool create_bitset(Bitset* bitset, uint64_t const size, Allocator& allocator)
 {

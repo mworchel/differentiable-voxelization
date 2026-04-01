@@ -9,7 +9,7 @@ namespace dvx
 
 // Compute a*b - c*d using Kahan's algorithm
 template<typename Float>
-Float kahan(Float a, Float b, Float c, Float d)
+HOST DEVICE Float kahan(Float a, Float b, Float c, Float d)
 {
     Float cd    = c * d;
     Float error = fma(c, d, -cd);
@@ -17,13 +17,13 @@ Float kahan(Float a, Float b, Float c, Float d)
 }
 
 #define VECTOR_MAKE_CONVENIENCE_ACCESSOR(name, index, N) \
-    inline T& name()                         \
+    HOST DEVICE inline T& name()                         \
         requires(index < N)                              \
     {                                                    \
         return (*this)[index];                           \
     }                                                    \
                                                          \
-    inline T const& name() const             \
+    HOST DEVICE inline T const& name() const             \
         requires(index < N)                              \
     {                                                    \
         return (*this)[index];                           \
@@ -31,7 +31,7 @@ Float kahan(Float a, Float b, Float c, Float d)
 
 #define DEFINE_BINARY_OPERATOR(type1, type2, rtype, op)                                                                                    \
     template<typename T, typename U, unsigned int N>                                                                                       \
-    rtype<decltype(std::declval<T>() op std::declval<U>()), N> operator op (type1<T, N> const& v1, type2<U, N> const& v2)        \
+    HOST DEVICE rtype<decltype(std::declval<T>() op std::declval<U>()), N> operator op (type1<T, N> const& v1, type2<U, N> const& v2)        \
     {                                                                                                                                      \
         rtype<decltype(std::declval<T>() op std::declval<U>()), N> out;                                                                  \
         for (unsigned int i = 0; i < N; i++)                                                                                               \
@@ -42,7 +42,7 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                                                                                      \
     template<typename T, typename U, unsigned int N,                                                                                       \
              std::enable_if_t<std::is_same_v<type1<T, N>, rtype<decltype(std::declval<T>() op std::declval<U>()), N>>>* = nullptr> \
-    type1<T, N>& operator op##= (type1<T, N>& v1, type2<U, N> const& v2)                                                           \
+    HOST DEVICE type1<T, N>& operator op##= (type1<T, N>& v1, type2<U, N> const& v2)                                                           \
     {                                                                                                                                      \
         for (unsigned int i = 0; i < N; i++)                                                                                               \
         {                                                                                                                                  \
@@ -54,7 +54,7 @@ Float kahan(Float a, Float b, Float c, Float d)
 // Same as `DEFINE_BINARY_OPERATOR` but N is a parameter
 #define DEFINE_BINARY_OPERATOR_N(type1, type2, rtype, N, op)                                                                         \
     template<typename T, typename U>                                                                                                 \
-    rtype<decltype(std::declval<T>() op std::declval<U>())> operator##op (type1<T> const& v1, type2<U> const& v2)           \
+    HOST DEVICE rtype<decltype(std::declval<T>() op std::declval<U>())> operator##op (type1<T> const& v1, type2<U> const& v2)           \
     {                                                                                                                                \
         rtype<decltype(std::declval<T>() op std::declval<U>())> out;                                                               \
         for (unsigned int i = 0; i < N; i++)                                                                                         \
@@ -64,7 +64,7 @@ Float kahan(Float a, Float b, Float c, Float d)
         return out;                                                                                                                  \
     }                                                                                                                                \
     template<typename T, typename U, std::enable_if_t<!std::is_same_v<type1<T>, type2<U>>>* = nullptr>                       \
-    rtype<decltype(std::declval<U>() op std::declval<T>())> operator##op (type2<U> const& v2, type1##<T> const& v1)           \
+    HOST DEVICE rtype<decltype(std::declval<U>() op std::declval<T>())> operator##op (type2<U> const& v2, type1##<T> const& v1)           \
     {                                                                                                                                \
         rtype<decltype(std::declval<U>() op std::declval<T>())> out;                                                               \
         for (unsigned int i = 0; i < N; i++)                                                                                         \
@@ -75,7 +75,7 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                                                                                \
     template<typename T, typename U,                                                                                                 \
              std::enable_if_t<std::is_same_v<type1<T>, rtype<decltype(std::declval<T>() op std::declval<U>())>>>* = nullptr> \
-    type1<T>& operator##op##=(type1<T>& v1, type2<U> const& v2)                                                              \
+    HOST DEVICE type1<T>& operator##op##=(type1<T>& v1, type2<U> const& v2)                                                              \
     {                                                                                                                                \
         for (unsigned int i = 0; i < N; i++)                                                                                         \
         {                                                                                                                            \
@@ -87,7 +87,7 @@ Float kahan(Float a, Float b, Float c, Float d)
 #define DEFINE_BINARY_OPERATOR_SCALAR(type, op)                                  \
     template<typename T, typename Scalar, unsigned int N,                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type<T, N> operator op (type<T, N> const& v, Scalar scalar)          \
+    HOST DEVICE type<T, N> operator op (type<T, N> const& v, Scalar scalar)          \
     {                                                                            \
         type<T, N> result;                                                     \
         for (unsigned int i = 0; i < N; ++i)                                     \
@@ -99,7 +99,7 @@ Float kahan(Float a, Float b, Float c, Float d)
                                                                                  \
     template<typename T, typename Scalar, unsigned int N,                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type<T, N> operator op (Scalar scalar, type<T, N> const& v)          \
+    HOST DEVICE type<T, N> operator op (Scalar scalar, type<T, N> const& v)          \
     {                                                                            \
         type<T, N> result;                                                     \
         for (unsigned int i = 0; i < N; ++i)                                     \
@@ -110,7 +110,7 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                            \
     template<typename T, typename Scalar, unsigned int N,                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type<T, N>& operator op##= (type<T, N> const& v, Scalar scalar)        \
+    HOST DEVICE type<T, N>& operator op##= (type<T, N> const& v, Scalar scalar)        \
     {                                                                            \
         for (unsigned int i = 0; i < N; i++)                                     \
         {                                                                        \
@@ -123,7 +123,7 @@ Float kahan(Float a, Float b, Float c, Float d)
 #define DEFINE_BINARY_OPERATOR_SCALAR_N(type, N, op)                             \
     template<typename T, typename Scalar,                                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type<T> operator op (type<T> const& v, Scalar scalar)                \
+    HOST DEVICE type<T> operator op (type<T> const& v, Scalar scalar)                \
     {                                                                            \
         type<T> result;                                                        \
         for (unsigned int i = 0; i < N; ++i)                                     \
@@ -135,7 +135,7 @@ Float kahan(Float a, Float b, Float c, Float d)
                                                                                  \
     template<typename T, typename Scalar,                                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type<T> operator op (Scalar scalar, type<T> const& v)                \
+    HOST DEVICE type<T> operator op (Scalar scalar, type<T> const& v)                \
     {                                                                            \
         type<T> result;                                                        \
         for (unsigned int i = 0; i < N; ++i)                                     \
@@ -146,7 +146,7 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                            \
     template<typename T, typename Scalar,                                        \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr> \
-    type<T>& operator op##= (type<T> const& v, Scalar scalar)              \
+    HOST DEVICE type<T>& operator op##= (type<T> const& v, Scalar scalar)              \
     {                                                                            \
         for (unsigned int i = 0; i < N; i++)                                     \
         {                                                                        \
@@ -157,7 +157,7 @@ Float kahan(Float a, Float b, Float c, Float d)
 
 #define DEFINE_MASKING_AND_REDUCTION_FUNCTIONS_N(type, N)                                             \
     template<typename T, typename Predicate>                                                          \
-    type<T> where(Predicate&& predicate, type<T> const& true_value, type<T> const& false_value) \
+    HOST DEVICE type<T> where(Predicate&& predicate, type<T> const& true_value, type<T> const& false_value) \
     {                                                                                                 \
         type<T> result;                                                                             \
         for (unsigned int i = 0; i < N; ++i)                                                          \
@@ -166,7 +166,7 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                                                 \
                                                                                                       \
     template<typename Predicate>                                                                      \
-    bool all(Predicate&& predicate)                                                                   \
+    HOST DEVICE bool all(Predicate&& predicate)                                                                   \
     {                                                                                                 \
         bool result = true;                                                                           \
         for (unsigned int i = 0; i < N; ++i)                                                          \
@@ -175,7 +175,7 @@ Float kahan(Float a, Float b, Float c, Float d)
     }                                                                                                 \
                                                                                                       \
     template<typename Predicate>                                                                      \
-    bool any(Predicate&& predicate)                                                                   \
+    HOST DEVICE bool any(Predicate&& predicate)                                                                   \
     {                                                                                                 \
         bool result = false;                                                                          \
         for (unsigned int i = 0; i < N; ++i)                                                          \
@@ -192,7 +192,7 @@ struct PredicateAnd
     Predicate1 const& pred1;
     Predicate2 const& pred2;
 
-    bool operator()(unsigned int i) const
+    HOST DEVICE bool operator()(unsigned int i) const
     {
         return pred1(i) && pred2(i);
     }
@@ -209,13 +209,13 @@ struct PredicateAnd
         typename Vector::ValueType value;                                                            \
         Vector const&              vector;                                                           \
                                                                                                      \
-        bool operator()(unsigned int i) const                                                        \
+        HOST DEVICE bool operator()(unsigned int i) const                                                        \
         {                                                                                            \
             return vector[i] op value;                                                               \
         }                                                                                            \
                                                                                                      \
         template<typename Other>                                                                     \
-        PredicateAnd<Predicate##suffix<Vector>, Other> operator&&(Other const& other) const        \
+        HOST DEVICE PredicateAnd<Predicate##suffix<Vector>, Other> operator&&(Other const& other) const        \
         {                                                                                            \
             return PredicateAnd<Predicate##suffix<Vector>, Other>{.pred1 = *this, .pred2 = other}; \
         }                                                                                            \
@@ -224,7 +224,7 @@ struct PredicateAnd
                                                                                                      \
     template<typename Vector, typename Scalar,                                                       \
              typename std::enable_if_t<std::is_arithmetic_v<Scalar>>* = nullptr>                     \
-    detail::Predicate##suffix<Vector> name (Vector const& vector, Scalar value)                   \
+    HOST DEVICE detail::Predicate##suffix<Vector> name (Vector const& vector, Scalar value)                   \
     {                                                                                                \
         using T = typename Vector::ValueType;                                                        \
         return detail::Predicate##suffix<Vector>{.value = T(value), .vector = vector};             \
@@ -236,13 +236,13 @@ DEFINE_PREDICATE(is_greater_equal, GreaterEq, >=);
 DEFINE_PREDICATE(is_greater, Greater, >);
 
 template<typename Vector>
-detail::PredicateNeq<Vector> is_nonzero(Vector const& vector)
+HOST DEVICE detail::PredicateNeq<Vector> is_nonzero(Vector const& vector)
 {
     return is_not_equal(vector, 0);
 }
 
 template<typename Vector>
-detail::PredicateEq<Vector> is_zero(Vector const& vector)
+HOST DEVICE detail::PredicateEq<Vector> is_zero(Vector const& vector)
 {
     return is_equal(vector, 0);
 }
@@ -255,39 +255,39 @@ public:
 
     static constexpr unsigned int Size = N;
 
-    inline VectorBase(T initial_value = T(0))
+    HOST DEVICE inline VectorBase(T initial_value = T(0))
     {
         for (unsigned int i = 0; i < N; ++i)
             m_data[i] = initial_value;
     }
 
     template<typename U>
-    inline VectorBase(VectorBase<U, N> const& other)
+    HOST DEVICE inline VectorBase(VectorBase<U, N> const& other)
     {
         (*this) = other;
     }
 
-    inline VectorBase(T const* data)
+    HOST DEVICE inline VectorBase(T const* data)
     {
         // Load vector from an array
         for (unsigned int i = 0; i < N; ++i)
             m_data[i] = data[i];
     }
 
-    inline T& operator[](unsigned int i)
+    HOST DEVICE inline T& operator[](unsigned int i)
     {
         assert(i < N);
         return m_data[i];
     }
 
-    inline T const& operator[](unsigned int i) const
+    HOST DEVICE inline T const& operator[](unsigned int i) const
     {
         assert(i < N);
         return m_data[i];
     }
 
     template<typename U>
-    inline VectorBase<T, N>& operator=(VectorBase<U, N> const& other)
+    HOST DEVICE inline VectorBase<T, N>& operator=(VectorBase<U, N> const& other)
     {
         for (unsigned int i = 0; i < N; i++)
         {
@@ -307,14 +307,14 @@ class Vector : public VectorBase<T, N>
 public:
     using VectorBase<T, N>::VectorBase;
 
-    inline Vector(T x, T y)
+    HOST DEVICE inline Vector(T x, T y)
         requires (N == 2)
     {
         VectorBase<T, N>::m_data[0] = x;
         VectorBase<T, N>::m_data[1] = y;
     }
 
-    inline Vector(T x, T y, T z)
+    HOST DEVICE inline Vector(T x, T y, T z)
         requires (N == 3)
     {
         VectorBase<T, N>::m_data[0] = x;
@@ -322,7 +322,7 @@ public:
         VectorBase<T, N>::m_data[2] = z;
     }
 
-    inline Vector(T x, T y, T z, T w)
+    HOST DEVICE inline Vector(T x, T y, T z, T w)
         requires (N == 4)
     {
         VectorBase<T, N>::m_data[0] = x;
@@ -336,7 +336,7 @@ public:
     VECTOR_MAKE_CONVENIENCE_ACCESSOR(z, 2, N);
     VECTOR_MAKE_CONVENIENCE_ACCESSOR(w, 3, N);
 
-    static Vector<T, N> load(T const* data, uint32_t const offset, uint32_t const stride = 1u)
+    HOST DEVICE static Vector<T, N> load(T const* data, uint32_t const offset, uint32_t const stride = 1u)
     {
         // Load data from an array
         Vector<T, N> out;
@@ -360,7 +360,7 @@ DEFINE_BINARY_OPERATOR(Vector, Vector, Vector, +)
 DEFINE_BINARY_OPERATOR(Vector, Vector, Vector, -)
 
 template<typename T, unsigned int N>
-Vector<T, N> operator-(Vector<T, N> const& v)
+HOST DEVICE Vector<T, N> operator-(Vector<T, N> const& v)
 {
     Vector<T, N> result;
     for (unsigned int i = 0; i < N; i++)
@@ -371,7 +371,7 @@ Vector<T, N> operator-(Vector<T, N> const& v)
 }
 
 template<typename T, unsigned int N>
-T dot(Vector<T, N> const& left, Vector<T, N> const& right)
+HOST DEVICE T dot(Vector<T, N> const& left, Vector<T, N> const& right)
 {
     T result(0);
     for (unsigned int i = 0; i < N; i++)
@@ -382,19 +382,19 @@ T dot(Vector<T, N> const& left, Vector<T, N> const& right)
 }
 
 template<typename T, unsigned int N>
-T squared_norm(Vector<T, N> const& v)
+HOST DEVICE T squared_norm(Vector<T, N> const& v)
 {
     return dot(v, v);
 }
 
 template<typename T, unsigned int N>
-T norm(Vector<T, N> const& v)
+HOST DEVICE T norm(Vector<T, N> const& v)
 {
     return std::sqrt(squared_norm(v));
 }
 
 template<typename T>
-Vector<T, 3> cross(Vector<T, 3> const& left, Vector<T, 3> const& right)
+HOST DEVICE Vector<T, 3> cross(Vector<T, 3> const& left, Vector<T, 3> const& right)
 {
     Vector<T, 3> result;
     result[0] = kahan(left[1], right[2], right[1], left[2]);
@@ -416,26 +416,26 @@ Vector<T, 3> cross(Vector<T, 3> const& left, Vector<T, 3> const& right)
  * \param[out] y The outgoing direction in world space, pointing away from the intersection point
  */
 template<typename T>
-void construct_frame(Vector<T, 3> const& z, Vector<T, 3>* x, Vector<T, 3>* y)
+HOST DEVICE void construct_frame(Vector<T, 3> const& z, Vector<T, 3>* x, Vector<T, 3>* y)
 {
     *x = normalize(cross(z + Vector<T, 3>(0.1f, 0.2f, 0.3f), z));
     *y = normalize(cross(z, *x));
 }
 
 template<typename T, unsigned int N>
-Vector<T, N> normalize(Vector<T, N> const& v)
+HOST DEVICE Vector<T, N> normalize(Vector<T, N> const& v)
 {
     return v / std::sqrt(dot(v, v));
 }
 
 template<typename T, unsigned int N>
-Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
+HOST DEVICE Vector<T, N> reflect(Vector<T, N> const& v, Vector<T, N> const& normal)
 {
     return normal * T(2) * dot(v, normal) - v;
 }
 
 template<typename T, unsigned int N>
-T volume(Vector<T, N> const& v)
+HOST DEVICE T volume(Vector<T, N> const& v)
 {
     T result(1);
     for (unsigned int i = 0; i < N; ++i)
@@ -465,7 +465,7 @@ class Point : public Vector<T, N>
 public:
     using Vector<T, N>::Vector;
 
-    static Point<T, N> load(T const* data, uint32_t const offset, uint32_t const stride = 1u)
+    HOST DEVICE static Point<T, N> load(T const* data, uint32_t const offset, uint32_t const stride = 1u)
     {
         // Load data from an array
         Point<T, N> out;

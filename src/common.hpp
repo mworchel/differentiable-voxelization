@@ -7,6 +7,7 @@
  */
 #ifdef __CUDACC__
 #define IS_CUDA 1
+#define HOST __host__
 #define DEVICE __device__
 #define CONSTANT __constant__
 #define MAYBE_STD(func) ::func
@@ -15,6 +16,7 @@
 #define FORCE_INLINE __forceinline__ 
 #else
 #define IS_CUDA 0
+#define HOST
 #define DEVICE
 #define CONSTANT
 // Mark a function that, on the CPU, lives in the `std` namespace
