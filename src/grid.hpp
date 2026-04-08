@@ -11,30 +11,30 @@ namespace dvx
 template<unsigned int N>
 struct Extent
 {
-    template<typename = std::enable_if_t<(N > 0u)>>
-    inline uint32_t width() const
+    HOST DEVICE inline uint32_t width() const
+        requires (N > 0)
     {
         return extents[0];
     }
 
-    template<typename = std::enable_if_t<(N > 1u)>>
-    inline uint32_t height() const
+    HOST DEVICE inline uint32_t height() const
+        requires (N > 1)
     {
         return extents[1];
     }
 
-    template<typename = std::enable_if_t<(N > 2u)>>
-    inline uint32_t depth() const
+    HOST DEVICE inline uint32_t depth() const
+        requires (N > 1)
     {
         return extents[2];
     }
 
-    inline uint32_t operator[](uint32_t i) const
+    HOST DEVICE inline uint32_t operator[](uint32_t i) const
     {
         return extents[i];
     }
 
-    inline uint64_t num_elements() const
+    HOST DEVICE inline uint64_t num_elements() const
     {
         uint64_t count = 1;
         for (unsigned int i = 0; i < N; ++i)
@@ -46,7 +46,7 @@ struct Extent
 };
 
 template<typename Float, unsigned int N>
-inline void get_grid_support(Point<Float, N> const& query_coord, Vector<Float, N> const& extent, int32_t min_coord[N], int32_t max_coord[N])
+HOST DEVICE inline void get_grid_support(Point<Float, N> const& query_coord, Vector<Float, N> const& extent, int32_t min_coord[N], int32_t max_coord[N])
 {
     for (unsigned int i = 0; i < N; ++i)
     {
@@ -56,7 +56,7 @@ inline void get_grid_support(Point<Float, N> const& query_coord, Vector<Float, N
 }
 
 template<typename Float, unsigned int N>
-inline Vector<Float, N> get_voxel_size(Extent<N> const& grid)
+HOST DEVICE inline Vector<Float, N> get_voxel_size(Extent<N> const& grid)
 {
     if constexpr (N == 2)
         return Vector2<Float>(
@@ -72,14 +72,14 @@ inline Vector<Float, N> get_voxel_size(Extent<N> const& grid)
 }
 
 template<typename Float, unsigned int N>
-inline Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
+HOST DEVICE inline Point<Float, N> point_to_grid_coord(Point<Float, N> const& x, Vector<Float, N> const& voxel_size)
 {
     Point<Float, N> const grid_origin(Float(-1));
     return (x - grid_origin) / voxel_size + Point<Float, N>(Float(0));
 }
 
 template<unsigned int N>
-inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Extent<N> const& grid)
+HOST DEVICE inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Extent<N> const& grid)
 {
     if constexpr (N == 2)
         return Point<uint32_t, N>(
@@ -95,7 +95,7 @@ inline Point<uint32_t, N> linear_index_to_coords(uint64_t const index, Extent<N>
 }
 
 template<unsigned int N>
-inline uint64_t coords_to_linear_index(Point<int32_t, N> const& coords, Extent<N> const& grid)
+HOST DEVICE inline uint64_t coords_to_linear_index(Point<int32_t, N> const& coords, Extent<N> const& grid)
 {
     // NOTE: No out-of-bounds check
 
