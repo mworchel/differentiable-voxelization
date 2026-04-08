@@ -11,7 +11,7 @@ bool create_bitset(Bitset* bitset, uint64_t const size, Allocator& allocator)
         .num_elements = static_cast<uint32_t>((size + Bitset::NumBitsPerElement - 1) / Bitset::NumBitsPerElement),
     };
     bitset->elements = allocator.allocate<Bitset::Integer>(bitset->num_elements);
-    MAYBE_STD(memset)(bitset->elements, 0, sizeof(Bitset::Integer) * bitset->num_elements);
+    allocator.memset(bitset->elements, 0, sizeof(Bitset::Integer) * bitset->num_elements);
     return true;
 }
 

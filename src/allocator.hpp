@@ -19,6 +19,8 @@ public:
     {
         return reinterpret_cast<T*>(allocate(sizeof(T) * size));
     }
+
+    virtual void memset(void* ptr, int value, uint64_t byte_size) = 0;
 };
 
 class DefaultAllocator : public Allocator
@@ -29,6 +31,8 @@ public:
     void* allocate(uint64_t byte_size, uint64_t alignment) override;
     
     void  deallocate(void* ptr) override;
+
+    void memset(void* ptr, int value, uint64_t byte_size) override;
 
     static DefaultAllocator& instance();
 };
