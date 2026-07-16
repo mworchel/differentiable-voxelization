@@ -47,7 +47,7 @@ pip install dvx-python
 To test the installation, run
 
 ```bash
-pip install numpy pytest
+pip install numpy pytest svgpathtools trimesh
 python -m pytest .\tests -v
 ```
 
