@@ -6,7 +6,11 @@ build-backend = "scikit_build_core.build"
 name = "dvx"
 requires-python = ">=3.8"
 version = "0.0.1"
-authors = [{name = "Markus Worchel", email = "m.worchel@tu-berlin.de"},{name = "Ugo Finnendahl", email = "finnendahl@tu-berlin.de"}]
+authors = [
+        {name = "Markus Worchel", email = "m.worchel@tu-berlin.de"},
+        {name = "Ugo Finnendahl", email = "finnendahl@tu-berlin.de"},
+        {name = "Tobias Djuren", email = "t.djuren@tu-berlin.de"}
+]
 license = {file = "LICENSE"}
 description = "..."
 urls = {Homepage = "https://github.com/mworchel"}
