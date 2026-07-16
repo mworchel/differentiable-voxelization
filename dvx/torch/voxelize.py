@@ -2,6 +2,7 @@ import functools
 import math
 import torch
 from typing import Any, Optional, Tuple
+import warnings
 
 import dvx_ext
 
@@ -98,7 +99,19 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
         backward_params['num_samples_per_simplex'] = kwargs.get('num_samples_per_simplex', 64)
         backward_params['filter_radius']           = filter_radius
 
+    device = vertices.device
+    if device.type != "cpu":
+        warnings.warn("dvx.voxelize(): The voxelization algorithms are currently implemented for CPU only. " 
+                     f"The input tensors will be moved from device '{device}' to the CPU for processing and then moved back. "
+                      "A GPU implementation is work in progress. "
+                      "To silence this warning, move the input tensors to the CPU before the call.")
+        vertices = vertices.cpu()
+        indices  = indices.cpu()
+
     occupancy = VoxelizeFunc.apply(grid_shape, vertices, indices, method, primal_params, backward_params)
+
+    if device.type != "cpu":
+        occupancy = occupancy.to(device)
 
     # Convert from [depth,height,width] -> [width,height,depth]
     # TODO: Use [depth,height,width] as canonical result
