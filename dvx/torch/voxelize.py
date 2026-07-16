@@ -102,6 +102,7 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
 
     # Convert from [depth,height,width] -> [width,height,depth]
     # TODO: Use [depth,height,width] as canonical result
+    # TODO: This also applies to dim == 2
     if method == 'mc' and dim == 3:
         occupancy = occupancy.T 
 
