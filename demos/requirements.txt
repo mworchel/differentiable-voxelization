@@ -1,0 +1,7 @@
+torch==2.11.0
+numpy
+polyscope
+tqdm
+jupyter
+dvx-python
+--extra-index-url https://download.pytorch.org/whl/cu128
