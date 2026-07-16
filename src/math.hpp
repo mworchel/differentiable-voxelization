@@ -4,6 +4,8 @@
 #include <cmath>
 #include <type_traits>
 
+#include "common.hpp"
+
 namespace dvx
 {
 

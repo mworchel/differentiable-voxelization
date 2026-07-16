@@ -1,12 +1,14 @@
 # Add the core library containing the algorithms
 add_library(dvx allocator.hpp allocator.cpp
                 bitset.hpp bitset.cpp
+                closed_form.hpp
                 common.hpp 
                 coverage.hpp
                 differentiation.hpp
                 filter.hpp 
                 flags.hpp
                 grid.hpp
+                log.hpp log.cpp
                 math.hpp
                 monte_carlo.hpp
                 winding_number.hpp)
@@ -32,7 +34,6 @@ nanobind_add_module(
 
   # Source code goes here
   ext.cpp
-  log.hpp log.cpp
 )
 
 target_link_libraries(dvx_ext PRIVATE dvx)
