@@ -11,6 +11,7 @@ add_library(dvx allocator.hpp allocator.cpp
                 monte_carlo.hpp
                 winding_number.hpp)
 target_include_directories(dvx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(dvx PUBLIC DVX_VERSION="${PROJECT_VERSION}")
 
 # Add the Python extension
 nanobind_add_module(

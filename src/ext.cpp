@@ -243,14 +243,16 @@ void voxelize_backward_cf(nb::ndarray<Float, nb::c_contig> const&    vertices,
 
 NB_MODULE(dvx_ext, m)
 {
-#if NDEBUG
-    std::string build_type = "Release";
-#else
-    std::string build_type = "Debug";
-#endif
+    m.attr("__version__") = DVX_VERSION;
 
     m.def("build_type", [=]()
-          { return build_type; });
+          {
+#if NDEBUG
+              return "Release";
+#else
+              return "Debug";
+#endif
+          });
 
     nb::enum_<dvx::SamplingFlagBits>(m, "SamplingFlags", nb::is_arithmetic())
         .value("Empty", dvx::SamplingFlagBits::None)

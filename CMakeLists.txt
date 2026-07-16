@@ -1,8 +1,6 @@
 # CMake 3.25.2 is required for NVCC 12 + CUDA20 support
 cmake_minimum_required(VERSION 3.25.2)
 
-project(diffvoxel LANGUAGES CXX)
-
 # Nanobind setup from https://github.com/wjakob/nanobind_example/blob/master/CMakeLists.txt
 if (NOT SKBUILD)
     message(WARNING "\
@@ -24,7 +22,11 @@ if (NOT SKBUILD)
     the package is imported. Otherwise, you need to re-run the above
     after editing C++ files. If you want to modify the CUDA kernels,
     add -Ccmake.define.DVX_BUILD_KERNELS=ON to the command.")
+
+    set(SKBUILD_PROJECT_VERSION "0.0.0") # Fallback: cannot pull version from pyproject.toml
 endif()
+
+project(dvx LANGUAGES CXX VERSION ${SKBUILD_PROJECT_VERSION})
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
