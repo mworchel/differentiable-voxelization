@@ -32,7 +32,8 @@
 
 This repository contains the official implementation of the paper "Differentiable Voxelization of Shape Representations".
 
-The algorithms are implement in C++, targeting the CPU and the GPU (using CUDA). The `dvx` package exposes these algorithms to Python, where they are readily usable with PyTorch, NumPy, and [Dr.Jit](https://github.com/mitsuba-renderer/drjit).
+The algorithms are implement in C++, targeting the CPU (a CUDA GPU implementation is work in progress). The `dvx` package exposes these algorithms to Python, where they are readily usable with PyTorch.
+<!-- , NumPy, and [Dr.Jit](https://github.com/mitsuba-renderer/drjit). -->
 
 ## Installation
 
@@ -51,7 +52,7 @@ pip install numpy pytest svgpathtools trimesh
 python -m pytest .\tests -v
 ```
 
-Some tests will be skipped, depending on the availability of packages (NumPy is required, PyTorch/Dr.Jit are optional).
+Some tests may be skipped, depending on the availability of packages.
 
 ## Usage
 

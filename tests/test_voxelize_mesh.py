@@ -19,7 +19,7 @@ def load_test_shape(dim: int):
         v, f = np.array(mesh.vertices, dtype=np.float32), np.array(mesh.faces, dtype=np.int32)
         winding_number_range = [0, 1]
     elif dim == 2:
-        v, f = utils.load_svg_as_linear_path(TEST_DATA_DIR / "twist.svg", 0)
+        v, f = utils.load_svg_as_linear_path(TEST_DATA_DIR / "twist.svg", path_idx=0)
         winding_number_range = [-1, 3]
     else:
         raise ValueError("Only 2D/3D shapes are available for testing.")
@@ -53,5 +53,32 @@ def test_primal_monte_carlo(dim: int, precision: int, resolution: int, num_sampl
     voxelize_func = getattr(dvx_ext, f"voxelize_mc_f{precision}")
     voxelize_extra_args = {}
     voxelize_extra_args["num_samples_per_voxel"] = num_samples
-    voxelize_extra_args["filter_radius"] = 0.5 * (2 / resolution) # half a voxel filter size
+    voxelize_extra_args["filter_radius"] = 0.5 * (2 / resolution) # half a voxel size
     _test_primal(functools.partial(voxelize_func, **voxelize_extra_args), dim, precision, resolution)
+
+# Minimal tests for framework frontends
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize("framework", ["torch"])
+def test_framework_frontend(framework: str, device: str):
+    pytest.importorskip(framework)
+
+    if framework == "torch":
+        import torch
+        import dvx.torch as dvx
+        v, f, _ = load_test_shape(dim=3)
+        v = torch.from_numpy(v).to(device=device)
+        f = torch.from_numpy(f).to(device=device)
+        v.requires_grad_(True)
+    elif framework == "drjit":
+        pass
+    else:
+        raise ValueError(f"Unknown framework '{framework}'.")
+        
+    n = 32
+    voxels = dvx.voxelize(n, v, f)
+
+    if framework == "torch":
+        assert voxels.shape == (n, n, n)
+        assert voxels.device.type == device
+        voxels.sum().backward()
+        assert v.grad is not None
