@@ -1,11 +1,11 @@
 <p align="center">
 
   <!-- Final URL: https://dl.acm.org/doi/10.1145/3799902.3811203 -->
-  <h1 align="center"><a href="https://cybertron.cg.tu-berlin.de/projects/differentiable-voxelization/media/paper.pdf">Differentiable Voxelization of Shape Representations</a></h1>
+  <h1 align="center"><a href="https://cybertron.cg.tu-berlin.de/projects/differentiable-voxelization/media/paper.pdf">Differentiable Voxelization of Surface Representations</a></h1>
 
   <div  align="center">
     <a href="https://cybertron.cg.tu-berlin.de/projects/differentiable-voxelization/media/paper.pdf">
-      <img src="." alt="Logo" width="100%">
+      <img src="assets/banner.png" alt="Logo" width="100%">
     </a>
   </div>
 
@@ -30,7 +30,7 @@
 
 ## About
 
-This repository contains the official implementation of the paper "Differentiable Voxelization of Shape Representations".
+This repository contains the official implementation of the paper "Differentiable Voxelization of Surface Representations".
 
 The algorithms are implement in C++, targeting the CPU (a CUDA GPU implementation is work in progress). The `dvx` package exposes these algorithms to Python, where they are readily usable with PyTorch.
 <!-- , NumPy, and [Dr.Jit](https://github.com/mitsuba-renderer/drjit). -->
@@ -56,7 +56,7 @@ Some tests may be skipped, depending on the availability of packages.
 
 ### Usage
 
-This is a minimal PyTorch example that demonstrates triangle mesh voxelization using the `dvx` package. For more usage examples, see the [demos](demos) folder.
+This is a minimal PyTorch example that demonstrates triangle mesh voxelization. For more usage examples, see the [demos](demos) folder.
 
 ```python
 import dvx.torch as dvx
