@@ -56,7 +56,7 @@ Some tests may be skipped, depending on the availability of packages.
 
 ### Usage
 
-This is a minimal PyTorch example that demonstrates triangle mesh voxelization. For more usage examples, see the [demos](demos) folder. The demos include examples for bandsaw cutting, space tilings in $\mathbb{R}^3$ and for self-intersection resolving to generate similar results as in the paper.
+This is a minimal PyTorch example that demonstrates triangle mesh voxelization:
 
 ```python
 import dvx.torch as dvx
@@ -74,6 +74,8 @@ voxels = dvx.voxelize(n, v, f)
 loss = some_loss(voxels)
 loss.backward() # Gradients are propagated to the mesh vertices v
 ```
+
+For more usage examples, see the [demos](demos) folder. The demos include examples for bandsaw cutting, space tilings in $\mathbb{R}^3$ and for self-intersection resolving to generate similar results as in the paper.
 
 ## License and Copyright
 
