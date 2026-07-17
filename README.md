@@ -4,7 +4,7 @@
   <h1 align="center"><a href="https://cybertron.cg.tu-berlin.de/projects/differentiable-voxelization/media/paper.pdf">Differentiable Voxelization of Surface Representations</a></h1>
 
   <div  align="center">
-    <a href="https://cybertron.cg.tu-berlin.de/projects/differentiable-voxelization/media/paper.pdf">
+    <a href="https://dl.acm.org/doi/10.1145/3799902.3811203">
       <img src="assets/banner.png" alt="Logo" width="100%">
     </a>
   </div>
