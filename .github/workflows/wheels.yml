@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-13]
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
 
     steps:
       - uses: actions/checkout@v5
@@ -70,3 +70,28 @@ jobs:
         path: dist
 
     - uses: pypa/gh-action-pypi-publish@v1.4.2
+
+  publish_to_testpypi:
+    name: Publish to TestPyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/dvx-python
+
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - uses: actions/setup-python@v4
+
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: "*"         # Downloads ALL artifacts
+        merge-multiple: true # and flattens them into a single directory
+        path: dist
+
+    - uses: pypa/gh-action-pypi-publish@v1.4.2
+      with:
+        repository-url: https://test.pypi.org/legacy/
