@@ -55,7 +55,7 @@ Some tests may be skipped, depending on the availability of packages.
 
 ### Usage
 
-This is a minimal PyTorch example that demonstrates triangle mesh voxelization:
+This is a minimal PyTorch example that demonstrates triangle mesh voxelization in $\mathbb{R}^3$:
 
 ```python
 import dvx.torch as dvx
@@ -64,7 +64,7 @@ import dvx.torch as dvx
 v, f = ...
 v.requires_grad_(True)
 
-# Resolution of the voxel grid
+# Resolution of the voxel grid (same resolution in all dimensions)
 n = 64 
 
 # Voxelize the mesh -> returns a grid with shape (n,n,n) of smoothed winding numbers
@@ -74,7 +74,27 @@ loss = some_loss(voxels)
 loss.backward() # Gradients are propagated to the mesh vertices v
 ```
 
-For more usage examples, see the [demos](demos) folder. The demos include examples for bandsaw cutting, space tilings in $\mathbb{R}^3$ and for self-intersection resolving to generate similar results as in the paper.
+For more usage examples, see the [demos](demos) folder. The demos include examples for bandsaw cutting, space tilings in $\mathbb{R}^3$ and for self-intersection resolving to generate results similar to the ones in the paper.
+
+## Conventions for Coordinates and Data Layout
+
+The volume considered for voxelization is the $[-1, 1]^d$ cube, where $d$ is the dimensionality of the space. The input shape (e.g., a triangle mesh) must be *fully* contained within this volume, otherwise the output is undefined $\space^1$. 
+
+The voxel grid covers this volume exactly, which means it reaches from $(-1, -1, \ldots, -1) \in \mathbb{R}^d$ to $(1, 1, \ldots, 1) \in \mathbb{R}^d$. We use standard naming conventions to denote points in space: $(x, y)$ for $\mathbb{R}^2$ and $(x, y, z)$ for $\mathbb{R}^3$. 
+
+For two-dimensional input and a resolution of $w$ in x-direction and $h$ in y-direction, the result is an array of shape $(h, w)$. Similarly, for three-dimensional input with the same resolutions in x- and y-directions, and a resolution of $d$ in z-direction, the result is an array of shape $(d, h, w)$. The voxel data is stored in row-major order, i.e., the index in x-direction is the fastest varying, followed by y and z.
+
+The value of a voxel is the smoothed winding number field evaluated at its center. 
+
+The following sketch summarizes our conventions for coordinates and the data layout in $\mathbb{R}^2$ and $\mathbb{R}^3$:
+
+<div  align="center">
+    <img src="assets/conventions.png" alt="Logo" width="100%">
+</div>
+
+
+
+$\space^1$ This restriction is not a limitation of the method itself, but rather a consequence of how the closed-form integration is currently implemented. It will be lifted in a future release.
 
 ## License and Copyright
 
