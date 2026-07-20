@@ -21,7 +21,9 @@ content-type = "text/markdown"
 
 [project.optional-dependencies]
 test = ["numpy",
-        "pytest"]
+        "pytest",
+        "svgpathtools",
+        "trimesh"]
 
 [tool.scikit-build]
 wheel.expand-macos-universal-tags = true
