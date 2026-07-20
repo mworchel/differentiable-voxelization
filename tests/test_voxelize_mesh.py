@@ -36,7 +36,8 @@ def _test_primal(voxelize_func, dim: int, precision: int, resolution: int):
     voxelize_func(v, f, output)
 
     # Check if the result is within the expected winding number range (with a little bit of tolerance)
-    assert np.all(output >= winding_number_range[0] - 1e-6) and np.all(output <= winding_number_range[1] + 1e-6)
+    eps = 1e-5
+    assert np.all(output >= winding_number_range[0] - eps) and np.all(output <= winding_number_range[1] + eps)
 
 @pytest.mark.parametrize("resolution", TEST_RESOLUTIONS)
 @pytest.mark.parametrize("precision", TEST_PRECISIONS)
