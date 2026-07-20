@@ -56,10 +56,10 @@ def test_primal_monte_carlo(dim: int, precision: int, resolution: int, num_sampl
     voxelize_extra_args["filter_radius"] = 0.5 * (2 / resolution) # half a voxel size
     _test_primal(functools.partial(voxelize_func, **voxelize_extra_args), dim, precision, resolution)
 
-# Minimal tests for framework frontends
+# Minimal tests for framework frontends (primal + gradient)
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 @pytest.mark.parametrize("framework", ["torch"])
-def test_framework_frontend(framework: str, device: str):
+def test_framework_minimal(framework: str, device: str):
     pytest.importorskip(framework)
 
     if framework == "torch":

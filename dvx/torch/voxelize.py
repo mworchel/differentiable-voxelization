@@ -58,7 +58,7 @@ class VoxelizeFunc(torch.autograd.Function):
 
 def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str = 'auto', filter_radius: Optional[float] = None, **kwargs):
     """
-    Voxelize a polygon or triangle mesh inside the [-1,1]^3 cube.
+    Voxelize a closed polygon or triangle mesh inside the [-1,1]^3 cube.
 
     Parameters
     ----------
@@ -76,7 +76,7 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
     Returns
     -------
     torch.Tensor
-        The occupancy as an array of shape (H,W) or (D,H,W).
+        The voxel grid with winding numbers as an array of shape (H,W) or (D,H,W).
     """
 
     dim = vertices.shape[1]
