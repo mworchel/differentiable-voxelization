@@ -82,6 +82,8 @@ jobs:
     name: Publish to TestPyPI
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
+    # Only enable this job on manual dispatch
+    if: github.event_name == 'workflow_dispatch'
 
     environment:
       name: testpypi
