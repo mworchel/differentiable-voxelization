@@ -4,7 +4,10 @@ import torch
 from typing import Any, Optional, Tuple
 import warnings
 
+import dvx.common
 import dvx_ext
+
+__all__ = ["voxelize", "VoxelizeFunc"]
 
 class VoxelizeFunc(torch.autograd.Function):
     @staticmethod
@@ -22,20 +25,20 @@ class VoxelizeFunc(torch.autograd.Function):
 
         primal_func = functools.partial(primal_func, **primal_params)
 
-        occupancy = torch.zeros(grid_shape, dtype=vertices.dtype, device=device)
-        primal_func(vertices, indices, occupancy)
+        voxels = torch.zeros(grid_shape, dtype=vertices.dtype, device=device)
+        primal_func(vertices, indices, voxels)
 
-        ctx.save_for_backward(vertices, indices, occupancy)
+        ctx.save_for_backward(vertices, indices, voxels)
 
         ctx.method          = method
         ctx.primal_params   = primal_params
         ctx.backward_params = backward_params
 
-        return occupancy
+        return voxels
     
     @staticmethod
-    def backward(ctx: Any, δoccupancy: torch.Tensor):
-        vertices, indices, occupancy = ctx.saved_tensors # Unused
+    def backward(ctx: Any, δvoxels: torch.Tensor):
+        vertices, indices, voxels = ctx.saved_tensors # Unused
         method = ctx.method
 
         dtype  = vertices.dtype
@@ -52,7 +55,7 @@ class VoxelizeFunc(torch.autograd.Function):
         backward_func = functools.partial(backward_func, **ctx.backward_params)
 
         δvertices = torch.zeros_like(vertices, dtype=dtype, device=device)
-        backward_func(vertices, indices, occupancy, δvertices, δoccupancy)
+        backward_func(vertices, indices, voxels, δvertices, δvoxels)
 
         return None, δvertices, None, None, None, None
 
@@ -82,7 +85,7 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
     dim = vertices.shape[1]
     grid_shape = [n]*dim
 
-    half_voxel_size = 0.5 * (2 / n)
+    half_voxel_size = dvx.common.half_voxel_size(n)
     if filter_radius is None:
         filter_radius = half_voxel_size
     elif method == 'cf' and not math.isclose(half_voxel_size, filter_radius):
@@ -108,15 +111,14 @@ def voxelize(n: int, vertices: torch.Tensor, indices: torch.Tensor, method: str 
         vertices = vertices.cpu()
         indices  = indices.cpu()
 
-    occupancy = VoxelizeFunc.apply(grid_shape, vertices, indices, method, primal_params, backward_params)
+    voxels = VoxelizeFunc.apply(grid_shape, vertices, indices, method, primal_params, backward_params)
 
     if device.type != "cpu":
-        occupancy = occupancy.to(device)
+        voxels = voxels.to(device)
 
-    # Convert from [depth,height,width] -> [width,height,depth]
-    # TODO: Use [depth,height,width] as canonical result
-    # TODO: This also applies to dim == 2
-    if method == 'mc' and dim == 3:
-        occupancy = occupancy.T 
+    # Convert from [width,height]/[width,height,depth] -> [height,width]/[depth,height,width] for the `cf` method
+    # FIXME: This temporary workaround regresses performance on the most common path, but it is currently required because `cf` uses another coordinate convention.
+    if method == 'cf':
+        voxels = voxels.transpose(0, -1)
 
-    return occupancy
+    return voxels
