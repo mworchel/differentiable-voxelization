@@ -1,7 +1,6 @@
 <p align="center">
 
-  <!-- Final URL: https://dl.acm.org/doi/10.1145/3799902.3811203 -->
-  <h1 align="center"><a href="https://cybertron.cg.tu-berlin.de/projects/differentiable-voxelization/media/paper.pdf">Differentiable Voxelization of Surface Representations</a></h1>
+  <h1 align="center"><a href="https://dl.acm.org/doi/10.1145/3799902.3811203">Differentiable Voxelization of Surface Representations</a></h1>
 
   <div  align="center">
     <a href="https://dl.acm.org/doi/10.1145/3799902.3811203">
@@ -86,16 +85,19 @@ The code in this repository is provided under a BSD 3-clause license.
 If you use this code or our method in your research, please cite our paper:
 
 ```bibtex
-@inproceedings{djuren:2026:diffvoxel,
+@inproceedings{Djuren:2026:DVX,
     author = {Djuren, Tobias and Finnendahl, Ugo and Worchel, Markus and Meyer, Hendrik and Alexa, Marc},
     title = {Differentiable Voxelization of Surface Representations},
     year = {2026},
-    isbn = {979-8-4007-2554-8/2026/07},
+    isbn = {9798400725548},
     publisher = {Association for Computing Machinery},
     address = {New York, NY, USA},
     url = {https://doi.org/10.1145/3799902.3811203},
     doi = {10.1145/3799902.3811203},
+    abstract = {Different shape representations facilitate different computations. Surface representations, in particular meshes, are often used for modeling, whereas volume representations are useful for spatial queries such as intersection or containment. Optimizing a surface representation based on a volumetric properties by gradient descent requires the derivatives of the volume relative to its bounding surface. We derive this gradient for winding numbers and show that it can be efficiently computed for volumetric values sampled on a regular grid (voxel representation) and surface parameters based on vertex sets (triangle meshes). This enables an efficient solution for a variety of optimization problems. We demonstrate the practical use of this approach at the examples of deforming meshes to resolve intersections, being manufacturable by cutting with a bandsaw from three directions, and creating shapes that are close to tiling 3D space.},
     booktitle = {Proceedings of the Special Interest Group on Computer Graphics and Interactive Techniques Conference Conference Papers},
+    articleno = {22},
+    numpages = {12},
     keywords = {differentiable voxelization, efficient voxelization, smoothed winding numbers, shape optimization},
     location = {
     },
