@@ -82,3 +82,62 @@ def test_framework_minimal(framework: str, device: str):
         assert voxels.device.type == device
         voxels.sum().backward()
         assert v.grad is not None
+
+@pytest.mark.parametrize("dim", TEST_DIMENSIONS)
+@pytest.mark.parametrize("method", ["cf", "mc"])
+@pytest.mark.parametrize("framework", ["torch"])
+def test_coordinate_conventions(framework: str, method: str, dim: int):
+    # Test coordinate conventions on the *framework-level*
+    # (the internal conventions in low-level `dvx_ext` are currently inconsistent)
+
+    n = 8 # Voxel grid resolution
+
+    # Create test shapes (spanning only certain parts of the voxel grid)
+    # TODO: Maybe avoid symmetry for the tests
+    if dim == 2:
+        v = np.array([[-1, -1], [0, 0], [1, -1]], dtype=np.float32)
+        f = np.array([[0, 2], [2, 1], [1, 0]], dtype=np.int64)
+    elif dim == 3:
+        # Pyramid with the base in the xy-plane at z=-1 and the tip at (0, 0, 0)
+        z_min = -1
+        v = np.array([[-1, -1, z_min], [1, -1, z_min], [1, 1, z_min], [-1, 1, z_min], [0, 0, 0]], dtype=np.float32)
+        f = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], [2, 1, 0], [0, 3, 2]], dtype=np.int64)
+
+    if framework == "torch":
+        import torch
+        import dvx.torch as dvx
+        v = torch.from_numpy(v)
+        f = torch.from_numpy(f)
+    elif framework == "drjit":
+        pass
+    else:
+        raise ValueError(f"Unknown framework '{framework}'.")
+
+    voxels = dvx.voxelize(n, v, f, method=method)
+
+    if framework == "torch":
+        voxels = voxels.cpu().numpy()
+    elif framework == "drjit":
+        pass
+    else:
+        raise ValueError(f"Unknown framework '{framework}'.")
+
+    if dim == 2:
+        assert voxels[0, 0] > 0 # Bottom-left corner
+        assert voxels[0, n - 1] > 0 # Bottom-right corner
+        assert np.isclose(voxels[n - 1, 0], 0) # Top-left corner
+        assert np.isclose(voxels[n - 1, n - 1], 0) # Top-right corner
+        assert voxels[n//2 - 1, n//2 - 1] > 0 # Center
+    if dim == 3:
+        # Check if the corners in the xy-plane are occupied
+        assert voxels[0, 0, 0] > 0 # Bottom-left corner
+        assert voxels[0, 0, n - 1] > 0 # Bottom-right corner
+        assert voxels[0, n - 1, 0] > 0 # Top-left corner
+        assert voxels[0, n - 1, n - 1] > 0 # Top-right corner
+        # Check if the top corners are unoccupied
+        assert np.isclose(voxels[n - 1, n - 1, 0], 0) # Bottom-left corner
+        assert np.isclose(voxels[n - 1, n - 1, n - 1], 0) # Bottom-right corner
+        assert np.isclose(voxels[n - 1, 0, 0], 0) # Top-left corner
+        assert np.isclose(voxels[n - 1, 0, n -1], 0) # Top-right corner
+        # Check if the center is occupied
+        assert voxels[n//2 - 1, n//2 - 1, n//2 - 1] > 0 # Center
