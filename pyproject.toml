@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "dvx"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 version = "0.0.1"
 authors = [
         {name = "Markus Worchel", email = "m.worchel@tu-berlin.de"},
@@ -42,8 +42,6 @@ sdist.exclude = [".gitignore", ".gitmodules",
 # test-extras = ["test"]
 # Skip testing of PyPy and 32-bit wheels
 # test-skip = ["pp*", "*win32", "*i686", "*-musllinux*"]
-# Skip building on CPython 3.8 on all platforms
-skip = "cp38-*"
 build = ["*-macosx_x86_64", "*-macosx_universal2", "*-macosx_arm64", "*-win_amd64", "*-manylinux_x86_64", "*-musllinux_x86_64"]
 
 # Needed for full C++17 support
