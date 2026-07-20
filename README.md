@@ -44,7 +44,7 @@ pip install dvx-python
 
 ### Optional: Test the Installation
 
-To test the installation, run
+To test the installation or a local development build, in the cloned repository run:
 
 ```bash
 pip install numpy pytest svgpathtools trimesh
