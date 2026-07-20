@@ -69,7 +69,7 @@ jobs:
         merge-multiple: true # and flattens them into a single directory
         path: dist
 
-    - uses: pypa/gh-action-pypi-publish@v1.4.2
+    - uses: pypa/gh-action-pypi-publish@release/v1
 
   publish_to_testpypi:
     name: Publish to TestPyPI
@@ -92,6 +92,6 @@ jobs:
         merge-multiple: true # and flattens them into a single directory
         path: dist
 
-    - uses: pypa/gh-action-pypi-publish@v1.4.2
+    - uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/

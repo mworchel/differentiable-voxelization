@@ -37,9 +37,9 @@ sdist.exclude = [".gitignore", ".gitmodules",
 
 [tool.cibuildwheel]
 # Run the package tests on every wheel using `pytest`
-# test-command = "pytest {package}/tests"
+test-command = "pytest {package}/tests"
 # will install pytest and other packages in the `test` extra
-# test-extras = ["test"]
+test-extras = ["test"]
 # Skip testing of PyPy and 32-bit wheels
 # test-skip = ["pp*", "*win32", "*i686", "*-musllinux*"]
 build = ["*-macosx_x86_64", "*-macosx_universal2", "*-macosx_arm64", "*-win_amd64", "*-manylinux_x86_64", "*-musllinux_x86_64"]
