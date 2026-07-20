@@ -90,6 +90,8 @@ def test_coordinate_conventions(framework: str, method: str, dim: int):
     # Test coordinate conventions on the *framework-level*
     # (the internal conventions in low-level `dvx_ext` are currently inconsistent)
 
+    pytest.importorskip(framework)
+
     n = 8 # Voxel grid resolution
 
     # Create test shapes (spanning only certain parts of the voxel grid)
