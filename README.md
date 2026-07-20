@@ -29,7 +29,7 @@
 
 ## About
 
-This repository contains the official implementation of the paper "Differentiable Voxelization of Surface Representations", which introduces an efficient method for turning the surface representation of a shape (e.g. a triangle mesh) into a volumetric representation in a differentiable manner. Volumetric objectives, for example, for intersection avoidance, can be easily defined on the resulting voxel grid and drive the optimization of the surface.
+This repository contains the official implementation of the paper "Differentiable Voxelization of Surface Representations". The paper introduces an efficient method for converting the surface representation of a shape, in particular a triangle mesh, into a volumetric representation in a differentiable manner. The resulting voxel grid of winding numbers makes it straightforward to define volumetric objectives that drive the optimization of the underlying surface (e.g. for intersection avoidance).
 
 The algorithms are implement in C++, targeting the CPU (a CUDA GPU implementation is work in progress). The `dvx` package exposes these algorithms to Python, where they are readily usable with PyTorch.
 <!-- , NumPy, and [Dr.Jit](https://github.com/mitsuba-renderer/drjit). -->
